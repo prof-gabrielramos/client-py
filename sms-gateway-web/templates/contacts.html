@@ -1,0 +1,385 @@
+{% extends "base.html" %}
+
+{% block title %}Contatos - SMS Gateway{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="h3 mb-0">Contatos</h1>
+    <button class="btn btn-primary" onclick="showAddContactModal()">
+        <i class="fas fa-plus me-2"></i>
+        Adicionar Contato
+    </button>
+</div>
+
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="card-title mb-0">
+            <i class="fas fa-address-book me-2"></i>
+            Lista de Contatos
+        </h5>
+        <div class="input-group input-group-sm" style="width: 250px;">
+            <span class="input-group-text">
+                <i class="fas fa-search"></i>
+            </span>
+            <input type="text" class="form-control" id="searchInput" placeholder="Buscar por nome ou número..." 
+                   onkeyup="filterContacts()">
+        </div>
+    </div>
+    <div class="card-body">
+        {% if contacts %}
+            <div class="table-responsive">
+                <table class="table table-hover" id="contactsTable">
+                    <thead>
+                        <tr>
+                            <th>Nome</th>
+                            <th>Telefone</th>
+                            <th>Grupo</th>
+                            <th>Notas</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for contact in contacts %}
+                        <tr data-id="{{ loop.index }}" data-name="{{ contact[0].lower() }}" data-phone="{{ contact[1].lower() }}">
+                            <td>{{ contact[0] }}</td>
+                            <td>{{ contact[1] }}</td>
+                            <td>{{ contact[2] if contact[2] else '-' }}</td>
+                            <td>
+                                <div class="text-truncate" style="max-width: 200px;" title="{{ contact[3] if contact[3] else '' }}">
+                                    {{ contact[3] if contact[3] else '-' }}
+                                </div>
+                            </td>
+                            <td>
+                                <button class="btn btn-sm btn-outline-primary" onclick="showEditContactModal('{{ loop.index }}')">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="btn btn-sm btn-outline-danger" onclick="showDeleteContactModal('{{ loop.index }}')">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                                <button class="btn btn-sm btn-outline-info" onclick="sendMessageToContact('{{ loop.index }}')">
+                                    <i class="fas fa-paper-plane"></i>
+                                </button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <div class="text-center py-5">
+                <i class="fas fa-address-book fa-3x text-muted mb-3"></i>
+                <h5 class="text-muted">Nenhum contato encontrado</h5>
+                <p class="text-muted">Adicione contatos para enviar mensagens rapidamente.</p>
+                <button class="btn btn-primary" onclick="showAddContactModal()">
+                    <i class="fas fa-plus me-2"></i>
+                    Adicionar Primeiro Contato
+                </button>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Add Contact Modal -->
+<div class="modal fade" id="addContactModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Adicionar Novo Contato</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addContactForm">
+                    <div class="mb-3">
+                        <label for="addName" class="form-label">Nome *</label>
+                        <input type="text" class="form-control" id="addName" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="addPhone" class="form-label">Número de Telefone *</label>
+                        <input type="tel" class="form-control" id="addPhone" placeholder="+5511999999999" required>
+                        <div class="form-text">
+                            Digite o número no formato internacional (+55...) ou nacional.
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="addGroup" class="form-label">Grupo</label>
+                        <input type="text" class="form-control" id="addGroup" placeholder="Ex: Família, Trabalho">
+                    </div>
+                    <div class="mb-3">
+                        <label for="addNotes" class="form-label">Notas</label>
+                        <textarea class="form-control" id="addNotes" rows="3" placeholder="Informações adicionais sobre o contato"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="saveAddContactBtn" onclick="saveNewContact()">
+                    <i class="fas fa-save me-2"></i>
+                    Salvar Contato
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Contact Modal -->
+<div class="modal fade" id="editContactModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Editar Contato</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editContactForm">
+                    <input type="hidden" id="editContactId">
+                    <div class="mb-3">
+                        <label for="editName" class="form-label">Nome *</label>
+                        <input type="text" class="form-control" id="editName" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="editPhone" class="form-label">Número de Telefone *</label>
+                        <input type="tel" class="form-control" id="editPhone" required>
+                        <div class="form-text">
+                            Digite o número no formato internacional (+55...) ou nacional.
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="editGroup" class="form-label">Grupo</label>
+                        <input type="text" class="form-control" id="editGroup">
+                    </div>
+                    <div class="mb-3">
+                        <label for="editNotes" class="form-label">Notas</label>
+                        <textarea class="form-control" id="editNotes" rows="3"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="saveEditContactBtn" onclick="saveEditedContact()">
+                    <i class="fas fa-save me-2"></i>
+                    Salvar Alterações
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Contact Modal -->
+<div class="modal fade" id="deleteContactModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title">
+                    <i class="fas fa-trash me-2"></i>
+                    Excluir Contato
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="deleteContactId">
+                <p>Você tem certeza que deseja excluir este contato?</p>
+                <p><strong id="deleteContactName"></strong>: <span id="deleteContactPhone"></span></p>
+                <div class="alert alert-danger">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    Esta ação não pode ser desfeita.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-danger" id="confirmDeleteBtn" onclick="deleteContact()">
+                    <i class="fas fa-trash me-2"></i>
+                    Excluir
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Filter contacts
+    function filterContacts() {
+        const searchText = document.getElementById('searchInput').value.toLowerCase();
+        const rows = document.querySelectorAll('#contactsTable tbody tr');
+        
+        rows.forEach(row => {
+            const name = row.dataset.name;
+            const phone = row.dataset.phone;
+            const show = searchText === '' || name.includes(searchText) || phone.includes(searchText);
+            row.style.display = show ? '' : 'none';
+        });
+    }
+
+    // Show add contact modal
+    function showAddContactModal() {
+        const modal = new bootstrap.Modal(document.getElementById('addContactModal'));
+        document.getElementById('addContactForm').reset();
+        modal.show();
+    }
+
+    // Save new contact
+    function saveNewContact() {
+        const form = document.getElementById('addContactForm');
+        const saveBtn = document.getElementById('saveAddContactBtn');
+        
+        if (!form.checkValidity()) {
+            form.reportValidity();
+            return;
+        }
+        
+        const data = {
+            name: document.getElementById('addName').value,
+            phone: document.getElementById('addPhone').value,
+            group: document.getElementById('addGroup').value || '',
+            notes: document.getElementById('addNotes').value || ''
+        };
+        
+        saveBtn.disabled = true;
+        saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Salvando...';
+        
+        fetch('/api/contacts', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(data)
+        })
+        .then(response => response.json())
+        .then(result => {
+            if (result.error) {
+                showToast('Erro ao adicionar contato: ' + result.error, 'error');
+                return;
+            }
+            
+            showToast('Contato adicionado com sucesso!', 'success');
+            const modal = bootstrap.Modal.getInstance(document.getElementById('addContactModal'));
+            modal.hide();
+            location.reload();
+        })
+        .catch(error => {
+            showToast('Erro ao adicionar contato: ' + error.message, 'error');
+        })
+        .finally(() => {
+            saveBtn.disabled = false;
+            saveBtn.innerHTML = '<i class="fas fa-save me-2"></i>Salvar Contato';
+        });
+    }
+
+    // Show edit contact modal
+    function showEditContactModal(contactId) {
+        const modal = new bootstrap.Modal(document.getElementById('editContactModal'));
+        const row = document.querySelector(`#contactsTable tr[data-id="${contactId}"]`);
+        
+        document.getElementById('editContactId').value = contactId;
+        document.getElementById('editName').value = row.cells[0].textContent;
+        document.getElementById('editPhone').value = row.cells[1].textContent;
+        document.getElementById('editGroup').value = row.cells[2].textContent === '-' ? '' : row.cells[2].textContent;
+        document.getElementById('editNotes').value = row.cells[3].textContent === '-' ? '' : row.cells[3].textContent;
+        
+        modal.show();
+    }
+
+    // Save edited contact
+    function saveEditedContact() {
+        const form = document.getElementById('editContactForm');
+        const saveBtn = document.getElementById('saveEditContactBtn');
+        
+        if (!form.checkValidity()) {
+            form.reportValidity();
+            return;
+        }
+        
+        const contactId = document.getElementById('editContactId').value;
+        const data = {
+            name: document.getElementById('editName').value,
+            phone: document.getElementById('editPhone').value,
+            group: document.getElementById('editGroup').value || '',
+            notes: document.getElementById('editNotes').value || ''
+        };
+        
+        saveBtn.disabled = true;
+        saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Salvando...';
+        
+        fetch(`/api/contacts/${contactId}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(data)
+        })
+        .then(response => response.json())
+        .then(result => {
+            if (result.error) {
+                showToast('Erro ao atualizar contato: ' + result.error, 'error');
+                return;
+            }
+            
+            showToast('Contato atualizado com sucesso!', 'success');
+            const modal = bootstrap.Modal.getInstance(document.getElementById('editContactModal'));
+            modal.hide();
+            location.reload();
+        })
+        .catch(error => {
+            showToast('Erro ao atualizar contato: ' + error.message, 'error');
+        })
+        .finally(() => {
+            saveBtn.disabled = false;
+            saveBtn.innerHTML = '<i class="fas fa-save me-2"></i>Salvar Alterações';
+        });
+    }
+
+    // Show delete contact modal
+    function showDeleteContactModal(contactId) {
+        const modal = new bootstrap.Modal(document.getElementById('deleteContactModal'));
+        const row = document.querySelector(`#contactsTable tr[data-id="${contactId}"]`);
+        
+        document.getElementById('deleteContactId').value = contactId;
+        document.getElementById('deleteContactName').textContent = row.cells[0].textContent;
+        document.getElementById('deleteContactPhone').textContent = row.cells[1].textContent;
+        
+        modal.show();
+    }
+
+    // Delete contact
+    function deleteContact() {
+        const contactId = document.getElementById('deleteContactId').value;
+        const deleteBtn = document.getElementById('confirmDeleteBtn');
+        
+        deleteBtn.disabled = true;
+        deleteBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Excluindo...';
+        
+        fetch(`/api/contacts/${contactId}`, {
+            method: 'DELETE'
+        })
+        .then(response => response.json())
+        .then(result => {
+            if (result.error) {
+                showToast('Erro ao excluir contato: ' + result.error, 'error');
+                return;
+            }
+            
+            showToast('Contato excluído com sucesso!', 'success');
+            const modal = bootstrap.Modal.getInstance(document.getElementById('deleteContactModal'));
+            modal.hide();
+            location.reload();
+        })
+        .catch(error => {
+            showToast('Erro ao excluir contato: ' + error.message, 'error');
+        })
+        .finally(() => {
+            deleteBtn.disabled = false;
+            deleteBtn.innerHTML = '<i class="fas fa-trash me-2"></i>Excluir';
+        });
+    }
+
+    // Send message to contact
+    function sendMessageToContact(contactId) {
+        const row = document.querySelector(`#contactsTable tr[data-id="${contactId}"]`);
+        const phoneNumber = row.cells[1].textContent;
+        
+        // Redirect to send page with pre-filled phone number
+        window.location.href = `/send?phone=${encodeURIComponent(phoneNumber)}`;
+    }
+</script>
+{% endblock %}

@@ -1,0 +1,274 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - SMS Gateway{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="h3 mb-0">Dashboard</h1>
+    <a href="/send" class="btn btn-primary">
+        <i class="fas fa-paper-plane me-2"></i>
+        Enviar SMS
+    </a>
+</div>
+
+<!-- Statistics Cards -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card">
+            <div class="card-body stats-card">
+                <div class="stats-number text-primary">{{ stats.get('Pending', 0) + stats.get('Processed', 0) }}</div>
+                <div class="stats-label">Pendentes</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card">
+            <div class="card-body stats-card">
+                <div class="stats-number text-success">{{ stats.get('Sent', 0) + stats.get('Delivered', 0) }}</div>
+                <div class="stats-label">Enviadas</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card">
+            <div class="card-body stats-card">
+                <div class="stats-number text-info">{{ stats.get('Delivered', 0) }}</div>
+                <div class="stats-label">Entregues</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card">
+            <div class="card-body stats-card">
+                <div class="stats-number text-danger">{{ stats.get('Failed', 0) }}</div>
+                <div class="stats-label">Falharam</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Charts Row -->
+<div class="row mb-4">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-chart-line me-2"></i>
+                    Status das Mensagens (Últimos 7 dias)
+                </h5>
+            </div>
+            <div class="card-body">
+                <canvas id="statusChart" height="100"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-chart-pie me-2"></i>
+                    Distribuição
+                </h5>
+            </div>
+            <div class="card-body">
+                <canvas id="distributionChart"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Messages -->
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="card-title mb-0">
+            <i class="fas fa-clock me-2"></i>
+            Mensagens Recentes
+        </h5>
+        <a href="/messages" class="btn btn-outline-primary btn-sm">Ver Todas</a>
+    </div>
+    <div class="card-body">
+        {% if recent_messages %}
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Mensagem</th>
+                            <th>Destinatários</th>
+                            <th>Status</th>
+                            <th>Data</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for message in recent_messages %}
+                        <tr>
+                            <td>
+                                <div class="text-truncate" style="max-width: 200px;" title="{{ message[1] }}">
+                                    {{ message[1] }}
+                                </div>
+                            </td>
+                            <td>
+                                <span class="badge bg-secondary">Múltiplos</span>
+                            </td>
+                            <td>
+                                <span class="status-badge status-{{ message[3].lower() }}">
+                                    {% if message[3] == 'Pending' %}Pendente
+                                    {% elif message[3] == 'Processed' %}Processando
+                                    {% elif message[3] == 'Sent' %}Enviado
+                                    {% elif message[3] == 'Delivered' %}Entregue
+                                    {% elif message[3] == 'Failed' %}Falhou
+                                    {% else %}{{ message[3] }}
+                                    {% endif %}
+                                </span>
+                            </td>
+                            <td>
+                                <small class="text-muted">{{ message[4] }}</small>
+                            </td>
+                            <td>
+                                <button class="btn btn-sm btn-outline-primary" onclick="viewMessageDetails('{{ message[0] }}')">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <div class="text-center py-4">
+                <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
+                <h5 class="text-muted">Nenhuma mensagem encontrada</h5>
+                <p class="text-muted">Comece enviando sua primeira mensagem SMS.</p>
+                <a href="/send" class="btn btn-primary">
+                    <i class="fas fa-paper-plane me-2"></i>
+                    Enviar Primeira Mensagem
+                </a>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Message Details Modal -->
+<div class="modal fade" id="messageModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Detalhes da Mensagem</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="messageModalBody">
+                <div class="text-center">
+                    <div class="spinner-border" role="status">
+                        <span class="visually-hidden">Carregando...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    // Status Chart
+    const statusCtx = document.getElementById('statusChart').getContext('2d');
+    const statusData = JSON.parse('{{ stats|tojson|safe }}');
+    
+    new Chart(statusCtx, {
+        type: 'doughnut',
+        data: {
+            labels: ['Pendentes', 'Enviadas', 'Entregues', 'Falharam'],
+            datasets: [{
+                data: [
+                    (statusData.Pending || 0) + (statusData.Processed || 0),
+                    statusData.Sent || 0,
+                    statusData.Delivered || 0,
+                    statusData.Failed || 0
+                ],
+                backgroundColor: [
+                    '#FFC107',
+                    '#007BFF',
+                    '#28A745',
+                    '#DC3545'
+                ],
+                borderWidth: 0
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                }
+            }
+        }
+    });
+
+    // Distribution Chart
+    const distributionCtx = document.getElementById('distributionChart').getContext('2d');
+    
+    new Chart(distributionCtx, {
+        type: 'pie',
+        data: {
+            labels: Object.keys(statusData),
+            datasets: [{
+                data: Object.values(statusData),
+                backgroundColor: [
+                    '#FFC107',
+                    '#007BFF',
+                    '#28A745',
+                    '#17A2B8',
+                    '#DC3545'
+                ],
+                borderWidth: 0
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                }
+            }
+        }
+    });
+
+    // View message details
+    function viewMessageDetails(messageId) {
+        const modal = new bootstrap.Modal(document.getElementById('messageModal'));
+        const modalBody = document.getElementById('messageModalBody');
+        
+        modalBody.innerHTML = '<div class="text-center"><div class="spinner-border" role="status"><span class="visually-hidden">Carregando...</span></div></div>';
+        
+        modal.show();
+        
+        fetch('/api/message/' + messageId)
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    modalBody.innerHTML = '<div class="alert alert-danger"><i class="fas fa-exclamation-circle me-2"></i>' + data.error + '</div>';
+                    return;
+                }
+                
+                let recipientsHtml = '';
+                if (data.recipients && data.recipients.length > 0) {
+                    recipientsHtml = data.recipients.map(recipient => 
+                        '<tr><td>' + formatPhoneNumber(recipient.phoneNumber) + '</td><td>' + getStatusBadge(recipient.state) + '</td><td>' + (recipient.error || '-') + '</td></tr>'
+                    ).join('');
+                }
+                
+                modalBody.innerHTML = '<div class="row"><div class="col-md-6"><h6>Informações da Mensagem</h6><p><strong>ID:</strong> ' + data.id + '</p><p><strong>Status:</strong> ' + getStatusBadge(data.state) + '</p><p><strong>Mensagem:</strong></p><div class="bg-light p-3 rounded">' + (data.message || 'N/A') + '</div></div><div class="col-md-6"><h6>Destinatários</h6><div class="table-responsive"><table class="table table-sm"><thead><tr><th>Telefone</th><th>Status</th><th>Erro</th></tr></thead><tbody>' + recipientsHtml + '</tbody></table></div></div></div>';
+            })
+            .catch(error => {
+                modalBody.innerHTML = '<div class="alert alert-danger"><i class="fas fa-exclamation-circle me-2"></i>Erro ao carregar detalhes: ' + error.message + '</div>';
+            });
+    }
+
+    // Auto-refresh dashboard every 30 seconds
+    setInterval(function() {
+        location.reload();
+    }, 30000);
+</script>
+{% endblock %}

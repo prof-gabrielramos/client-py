@@ -1,0 +1,662 @@
+{% extends "base.html" %}
+
+{% block title %}Webhooks - SMS Gateway{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="h3 mb-0">Webhooks</h1>
+    <button class="btn btn-primary" onclick="showAddWebhookModal()">
+        <i class="fas fa-plus me-2"></i>
+        Adicionar Webhook
+    </button>
+</div>
+
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="card-title mb-0">
+            <i class="fas fa-webhook me-2"></i>
+            Webhooks Configurados
+        </h5>
+        <div class="input-group input-group-sm" style="width: 250px;">
+            <span class="input-group-text">
+                <i class="fas fa-search"></i>
+            </span>
+            <input type="text" class="form-control" id="searchInput" placeholder="Buscar por nome ou URL..." 
+                   onkeyup="filterWebhooks()">
+        </div>
+    </div>
+    <div class="card-body">
+        {% if webhooks %}
+            <div class="table-responsive">
+                <table class="table table-hover" id="webhooksTable">
+                    <thead>
+                        <tr>
+                            <th>Nome</th>
+                            <th>URL</th>
+                            <th>Eventos</th>
+                            <th>Status</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for webhook in webhooks %}
+                        <tr data-id="{{ loop.index }}" data-name="{{ webhook[0].lower() }}" data-url="{{ webhook[1].lower() }}">
+                            <td>{{ webhook[0] }}</td>
+                            <td>
+                                <div class="text-truncate" style="max-width: 250px;" title="{{ webhook[1] }}">
+                                    {{ webhook[1] }}
+                                </div>
+                            </td>
+                            <td>
+                                {% set events = webhook[2].split(',') %}
+                                {% for event in events %}
+                                    <span class="badge bg-info me-1">{{ event.strip() }}</span>
+                                {% endfor %}
+                            </td>
+                            <td>
+                                <span class="status-badge {% if webhook[3] %}status-sent{% else %}status-failed{% endif %}">
+                                    {% if webhook[3] %}Ativo{% else %}Inativo{% endif %}
+                                </span>
+                            </td>
+                            <td>
+                                <button class="btn btn-sm btn-outline-primary" onclick="showEditWebhookModal('{{ loop.index }}')">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="btn btn-sm btn-outline-danger" onclick="showDeleteWebhookModal('{{ loop.index }}')">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                                <button class="btn btn-sm btn-outline-info" onclick="testWebhook('{{ loop.index }}')">
+                                    <i class="fas fa-plug"></i>
+                                </button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <div class="text-center py-5">
+                <i class="fas fa-webhook fa-3x text-muted mb-3"></i>
+                <h5 class="text-muted">Nenhum webhook configurado</h5>
+                <p class="text-muted">Adicione webhooks para receber notificações sobre eventos de mensagens.</p>
+                <button class="btn btn-primary" onclick="showAddWebhookModal()">
+                    <i class="fas fa-plus me-2"></i>
+                    Adicionar Primeiro Webhook
+                </button>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Add Webhook Modal -->
+<div class="modal fade" id="addWebhookModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Adicionar Novo Webhook</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addWebhookForm">
+                    <div class="mb-3">
+                        <label for="addName" class="form-label">Nome *</label>
+                        <input type="text" class="form-control" id="addName" required>
+                        <div class="form-text">
+                            Um nome descritivo para identificar este webhook
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="addUrl" class="form-label">URL de Destino *</label>
+                        <input type="url" class="form-control" id="addUrl" placeholder="https://example.com/webhook" required>
+                        <div class="form-text">
+                            URL completa para onde os dados do webhook serão enviados
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Eventos *</label>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-check">
+                                    <input class="form-check-input event-checkbox" type="checkbox" id="addEventMessageSent" value="message.sent">
+                                    <label class="form-check-label" for="addEventMessageSent">
+                                        Mensagem Enviada
+                                    </label>
+                                </div>
+                                <div class="form-text">
+                                    Disparado quando uma mensagem é enviada com sucesso para o gateway
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-check">
+                                    <input class="form-check-input event-checkbox" type="checkbox" id="addEventMessageDelivered" value="message.delivered">
+                                    <label class="form-check-label" for="addEventMessageDelivered">
+                                        Mensagem Entregue
+                                    </label>
+                                </div>
+                                <div class="form-text">
+                                    Disparado quando uma mensagem é confirmada como entregue ao destinatário
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row mt-2">
+                            <div class="col-md-6">
+                                <div class="form-check">
+                                    <input class="form-check-input event-checkbox" type="checkbox" id="addEventMessageFailed" value="message.failed">
+                                    <label class="form-check-label" for="addEventMessageFailed">
+                                        Falha no Envio
+                                    </label>
+                                </div>
+                                <div class="form-text">
+                                    Disparado quando uma mensagem falha ao ser enviada ou entregue
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-check">
+                                    <input class="form-check-input event-checkbox" type="checkbox" id="addEventMessageReceived" value="message.received">
+                                    <label class="form-check-label" for="addEventMessageReceived">
+                                        Mensagem Recebida
+                                    </label>
+                                </div>
+                                <div class="form-text">
+                                    Disparado quando uma nova mensagem SMS é recebida (se suportado pelo gateway)
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="addHeaders" class="form-label">Cabeçalhos HTTP Personalizados (JSON)</label>
+                        <textarea class="form-control" id="addHeaders" rows="3" placeholder='{
+  "Authorization": "Bearer your_token",
+  "X-Custom-Header": "value"
+}'></textarea>
+                        <div class="form-text">
+                            Objeto JSON com cabeçalhos HTTP personalizados para incluir nas requisições do webhook
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="addEnabled" checked>
+                            <label class="form-check-label" for="addEnabled">
+                                Ativado
+                            </label>
+                        </div>
+                        <div class="form-text">
+                            Desative para pausar temporariamente este webhook sem excluí-lo
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="saveAddWebhookBtn" onclick="saveNewWebhook()">
+                    <i class="fas fa-save me-2"></i>
+                    Salvar Webhook
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Webhook Modal -->
+<div class="modal fade" id="editWebhookModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Editar Webhook</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editWebhookForm">
+                    <input type="hidden" id="editWebhookId">
+                    <div class="mb-3">
+                        <label for="editName" class="form-label">Nome *</label>
+                        <input type="text" class="form-control" id="editName" required>
+                        <div class="form-text">
+                            Um nome descritivo para identificar este webhook
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="editUrl" class="form-label">URL de Destino *</label>
+                        <input type="url" class="form-control" id="editUrl" required>
+                        <div class="form-text">
+                            URL completa para onde os dados do webhook serão enviados
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Eventos *</label>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-check">
+                                    <input class="form-check-input event-checkbox" type="checkbox" id="editEventMessageSent" value="message.sent">
+                                    <label class="form-check-label" for="editEventMessageSent">
+                                        Mensagem Enviada
+                                    </label>
+                                </div>
+                                <div class="form-text">
+                                    Disparado quando uma mensagem é enviada com sucesso para o gateway
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-check">
+                                    <input class="form-check-input event-checkbox" type="checkbox" id="editEventMessageDelivered" value="message.delivered">
+                                    <label class="form-check-label" for="editEventMessageDelivered">
+                                        Mensagem Entregue
+                                    </label>
+                                </div>
+                                <div class="form-text">
+                                    Disparado quando uma mensagem é confirmada como entregue ao destinatário
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row mt-2">
+                            <div class="col-md-6">
+                                <div class="form-check">
+                                    <input class="form-check-input event-checkbox" type="checkbox" id="editEventMessageFailed" value="message.failed">
+                                    <label class="form-check-label" for="editEventMessageFailed">
+                                        Falha no Envio
+                                    </label>
+                                </div>
+                                <div class="form-text">
+                                    Disparado quando uma mensagem falha ao ser enviada ou entregue
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-check">
+                                    <input class="form-check-input event-checkbox" type="checkbox" id="editEventMessageReceived" value="message.received">
+                                    <label class="form-check-label" for="editEventMessageReceived">
+                                        Mensagem Recebida
+                                    </label>
+                                </div>
+                                <div class="form-text">
+                                    Disparado quando uma nova mensagem SMS é recebida (se suportado pelo gateway)
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="editHeaders" class="form-label">Cabeçalhos HTTP Personalizados (JSON)</label>
+                        <textarea class="form-control" id="editHeaders" rows="3"></textarea>
+                        <div class="form-text">
+                            Objeto JSON com cabeçalhos HTTP personalizados para incluir nas requisições do webhook
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="editEnabled">
+                            <label class="form-check-label" for="editEnabled">
+                                Ativado
+                            </label>
+                        </div>
+                        <div class="form-text">
+                            Desative para pausar temporariamente este webhook sem excluí-lo
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="saveEditWebhookBtn" onclick="saveEditedWebhook()">
+                    <i class="fas fa-save me-2"></i>
+                    Salvar Alterações
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Webhook Modal -->
+<div class="modal fade" id="deleteWebhookModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title">
+                    <i class="fas fa-trash me-2"></i>
+                    Excluir Webhook
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="deleteWebhookId">
+                <p>Você tem certeza que deseja excluir este webhook?</p>
+                <p><strong id="deleteWebhookName"></strong></p>
+                <div class="alert alert-danger">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    Esta ação não pode ser desfeita.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-danger" id="confirmDeleteBtn" onclick="deleteWebhook()">
+                    <i class="fas fa-trash me-2"></i>
+                    Excluir
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Test Webhook Modal -->
+<div class="modal fade" id="testWebhookModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Testar Webhook</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="testWebhookId">
+                <p>Enviar uma requisição de teste para o webhook <strong id="testWebhookName"></strong>?</p>
+                <p>URL: <span id="testWebhookUrl" class="text-break"></span></p>
+                <div class="mb-3">
+                    <label for="testEvent" class="form-label">Evento de Teste</label>
+                    <select class="form-select" id="testEvent">
+                        <option value="message.sent">Mensagem Enviada</option>
+                        <option value="message.delivered">Mensagem Entregue</option>
+                        <option value="message.failed">Falha no Envio</option>
+                        <option value="message.received">Mensagem Recebida</option>
+                    </select>
+                </div>
+                <div id="testResult" class="mt-3"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                <button type="button" class="btn btn-primary" id="confirmTestBtn" onclick="sendTestWebhook()">
+                    <i class="fas fa-plug me-2"></i>
+                    Enviar Teste
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Filter webhooks
+    function filterWebhooks() {
+        const searchText = document.getElementById('searchInput').value.toLowerCase();
+        const rows = document.querySelectorAll('#webhooksTable tbody tr');
+        
+        rows.forEach(row => {
+            const name = row.dataset.name;
+            const url = row.dataset.url;
+            const show = searchText === '' || name.includes(searchText) || url.includes(searchText);
+            row.style.display = show ? '' : 'none';
+        });
+    }
+
+    // Show add webhook modal
+    function showAddWebhookModal() {
+        const modal = new bootstrap.Modal(document.getElementById('addWebhookModal'));
+        document.getElementById('addWebhookForm').reset();
+        modal.show();
+    }
+
+    // Save new webhook
+    function saveNewWebhook() {
+        const form = document.getElementById('addWebhookForm');
+        const saveBtn = document.getElementById('saveAddWebhookBtn');
+        
+        if (!form.checkValidity()) {
+            form.reportValidity();
+            return;
+        }
+        
+        // Get selected events
+        const eventCheckboxes = document.querySelectorAll('#addWebhookForm .event-checkbox:checked');
+        const events = Array.from(eventCheckboxes).map(cb => cb.value);
+        
+        if (events.length === 0) {
+            showToast('Selecione pelo menos um evento para o webhook', 'warning');
+            return;
+        }
+        
+        const data = {
+            name: document.getElementById('addName').value,
+            url: document.getElementById('addUrl').value,
+            events: events,
+            headers: document.getElementById('addHeaders').value || '{}',
+            enabled: document.getElementById('addEnabled').checked
+        };
+        
+        saveBtn.disabled = true;
+        saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Salvando...';
+        
+        fetch('/api/webhooks', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(data)
+        })
+        .then(response => response.json())
+        .then(result => {
+            if (result.error) {
+                showToast('Erro ao adicionar webhook: ' + result.error, 'error');
+                return;
+            }
+            
+            showToast('Webhook adicionado com sucesso!', 'success');
+            const modal = bootstrap.Modal.getInstance(document.getElementById('addWebhookModal'));
+            modal.hide();
+            location.reload();
+        })
+        .catch(error => {
+            showToast('Erro ao adicionar webhook: ' + error.message, 'error');
+        })
+        .finally(() => {
+            saveBtn.disabled = false;
+            saveBtn.innerHTML = '<i class="fas fa-save me-2"></i>Salvar Webhook';
+        });
+    }
+
+    // Show edit webhook modal
+    function showEditWebhookModal(webhookId) {
+        const modal = new bootstrap.Modal(document.getElementById('editWebhookModal'));
+        const row = document.querySelector(`#webhooksTable tr[data-id="${webhookId}"]`);
+        
+        document.getElementById('editWebhookId').value = webhookId;
+        document.getElementById('editName').value = row.cells[0].textContent;
+        document.getElementById('editUrl').value = row.cells[1].textContent;
+        document.getElementById('editEnabled').checked = row.cells[3].textContent.trim() === 'Ativo';
+        
+        // Reset all event checkboxes
+        document.querySelectorAll('#editWebhookForm .event-checkbox').forEach(cb => {
+            cb.checked = false;
+        });
+        
+        // Set event checkboxes based on row data
+        const eventsText = row.cells[2].textContent;
+        if (eventsText.includes('Mensagem Enviada')) {
+            document.getElementById('editEventMessageSent').checked = true;
+        }
+        if (eventsText.includes('Mensagem Entregue')) {
+            document.getElementById('editEventMessageDelivered').checked = true;
+        }
+        if (eventsText.includes('Falha no Envio')) {
+            document.getElementById('editEventMessageFailed').checked = true;
+        }
+        if (eventsText.includes('Mensagem Recebida')) {
+            document.getElementById('editEventMessageReceived').checked = true;
+        }
+        
+        // Fetch headers data (assuming it's stored somewhere)
+        document.getElementById('editHeaders').value = '';
+        fetch(`/api/webhooks/${webhookId}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.headers) {
+                    document.getElementById('editHeaders').value = data.headers;
+                }
+            })
+            .catch(error => {
+                console.error('Error fetching webhook details:', error);
+            });
+        
+        modal.show();
+    }
+
+    // Save edited webhook
+    function saveEditedWebhook() {
+        const form = document.getElementById('editWebhookForm');
+        const saveBtn = document.getElementById('saveEditWebhookBtn');
+        
+        if (!form.checkValidity()) {
+            form.reportValidity();
+            return;
+        }
+        
+        // Get selected events
+        const eventCheckboxes = document.querySelectorAll('#editWebhookForm .event-checkbox:checked');
+        const events = Array.from(eventCheckboxes).map(cb => cb.value);
+        
+        if (events.length === 0) {
+            showToast('Selecione pelo menos um evento para o webhook', 'warning');
+            return;
+        }
+        
+        const webhookId = document.getElementById('editWebhookId').value;
+        const data = {
+            name: document.getElementById('editName').value,
+            url: document.getElementById('editUrl').value,
+            events: events,
+            headers: document.getElementById('editHeaders').value || '{}',
+            enabled: document.getElementById('editEnabled').checked
+        };
+        
+        saveBtn.disabled = true;
+        saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Salvando...';
+        
+        fetch(`/api/webhooks/${webhookId}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(data)
+        })
+        .then(response => response.json())
+        .then(result => {
+            if (result.error) {
+                showToast('Erro ao atualizar webhook: ' + result.error, 'error');
+                return;
+            }
+            
+            showToast('Webhook atualizado com sucesso!', 'success');
+            const modal = bootstrap.Modal.getInstance(document.getElementById('editWebhookModal'));
+            modal.hide();
+            location.reload();
+        })
+        .catch(error => {
+            showToast('Erro ao atualizar webhook: ' + error.message, 'error');
+        })
+        .finally(() => {
+            saveBtn.disabled = false;
+            saveBtn.innerHTML = '<i class="fas fa-save me-2"></i>Salvar Alterações';
+        });
+    }
+
+    // Show delete webhook modal
+    function showDeleteWebhookModal(webhookId) {
+        const modal = new bootstrap.Modal(document.getElementById('deleteWebhookModal'));
+        const row = document.querySelector(`#webhooksTable tr[data-id="${webhookId}"]`);
+        
+        document.getElementById('deleteWebhookId').value = webhookId;
+        document.getElementById('deleteWebhookName').textContent = row.cells[0].textContent;
+        
+        modal.show();
+    }
+
+    // Delete webhook
+    function deleteWebhook() {
+        const webhookId = document.getElementById('deleteWebhookId').value;
+        const deleteBtn = document.getElementById('confirmDeleteBtn');
+        
+        deleteBtn.disabled = true;
+        deleteBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Excluindo...';
+        
+        fetch(`/api/webhooks/${webhookId}`, {
+            method: 'DELETE'
+        })
+        .then(response => response.json())
+        .then(result => {
+            if (result.error) {
+                showToast('Erro ao excluir webhook: ' + result.error, 'error');
+                return;
+            }
+            
+            showToast('Webhook excluído com sucesso!', 'success');
+            const modal = bootstrap.Modal.getInstance(document.getElementById('deleteWebhookModal'));
+            modal.hide();
+            location.reload();
+        })
+        .catch(error => {
+            showToast('Erro ao excluir webhook: ' + error.message, 'error');
+        })
+        .finally(() => {
+            deleteBtn.disabled = false;
+            deleteBtn.innerHTML = '<i class="fas fa-trash me-2"></i>Excluir';
+        });
+    }
+
+    // Test webhook
+    function testWebhook(webhookId) {
+        const modal = new bootstrap.Modal(document.getElementById('testWebhookModal'));
+        const row = document.querySelector(`#webhooksTable tr[data-id="${webhookId}"]`);
+        
+        document.getElementById('testWebhookId').value = webhookId;
+        document.getElementById('testWebhookName').textContent = row.cells[0].textContent;
+        document.getElementById('testWebhookUrl').textContent = row.cells[1].textContent;
+        document.getElementById('testResult').innerHTML = '';
+        
+        modal.show();
+    }
+
+    // Send test webhook
+    function sendTestWebhook() {
+        const webhookId = document.getElementById('testWebhookId').value;
+        const testEvent = document.getElementById('testEvent').value;
+        const testBtn = document.getElementById('confirmTestBtn');
+        const testResult = document.getElementById('testResult');
+        
+        testBtn.disabled = true;
+        testBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Enviando...';
+        testResult.innerHTML = '<div class="spinner-border spinner-border-sm text-primary me-2" role="status"><span class="visually-hidden">Enviando...</span></div> Enviando requisição de teste...';
+        
+        const data = {
+            event: testEvent
+        };
+        
+        fetch(`/api/webhooks/${webhookId}/test`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(data)
+        })
+        .then(response => response.json())
+        .then(result => {
+            if (result.success) {
+                testResult.innerHTML = '<div class="alert alert-success"><i class="fas fa-check-circle me-2"></i> Teste bem-sucedido! O webhook respondeu com status ' + result.status_code + '.</div>';
+                if (result.response) {
+                    testResult.innerHTML += '<div class="mt-2"><strong>Resposta:</strong> <pre class="bg-light p-2 rounded">' + JSON.stringify(result.response, null, 2) + '</pre></div>';
+                }
+            } else {
+                testResult.innerHTML = '<div class="alert alert-danger"><i class="fas fa-exclamation-circle me-2"></i> Falha no teste: ' + result.error + '</div>';
+                if (result.status_code) {
+                    testResult.innerHTML += '<div class="mt-2"><strong>Código de Status:</strong> ' + result.status_code + '</div>';
+                }
+                if (result.response) {
+                    testResult.innerHTML += '<div class="mt-2"><strong>Resposta de Erro:</strong> <pre class="bg-light p-2 rounded">' + JSON.stringify(result.response, null, 2) + '</pre></div>';
+                }
+            }
+        })
+        .catch(error => {
+            testResult.innerHTML = '<div class="alert alert-danger"><i class="fas fa-exclamation-circle me-2"></i> Erro ao enviar teste: ' + error.message + '</div>';
+        })
+        .finally(() => {
+            testBtn.disabled = false;
+            testBtn.innerHTML = '<i class="fas fa-plug me-2"></i>Enviar Teste';
+        });
+    }
+</script>
+{% endblock %}

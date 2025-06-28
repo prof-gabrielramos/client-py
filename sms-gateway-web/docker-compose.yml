@@ -1,0 +1,14 @@
+version: '3.8'
+
+services:
+  web:
+    build: .
+    image: sms-gateway-web:latest
+    container_name: sms-gateway-web
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./config:/root/.sms-gateway-web
+    environment:
+      - FLASK_ENV=production
+    restart: unless-stopped

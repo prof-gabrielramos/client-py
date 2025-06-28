@@ -1,0 +1,437 @@
+{% extends "base.html" %}
+
+{% block title %}Enviar SMS - SMS Gateway{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="h3 mb-0">Enviar SMS</h1>
+    <a href="/messages" class="btn btn-outline-primary">
+        <i class="fas fa-envelope me-2"></i>
+        Ver Mensagens
+    </a>
+</div>
+
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-paper-plane me-2"></i>
+                    Nova Mensagem SMS
+                </h5>
+            </div>
+            <div class="card-body">
+                <form id="smsForm">
+                    <!-- Message Text -->
+                    <div class="mb-3">
+                        <label for="message" class="form-label">Mensagem</label>
+                        <textarea class="form-control" id="message" name="message" rows="4" 
+                                  placeholder="Digite sua mensagem aqui..." required maxlength="1600"></textarea>
+                        <div class="form-text">
+                            <span id="charCount">0</span>/1600 caracteres
+                        </div>
+                    </div>
+
+                    <!-- Phone Numbers -->
+                    <div class="mb-3">
+                        <label for="phoneNumbers" class="form-label">Números de Telefone</label>
+                        <textarea class="form-control" id="phoneNumbers" name="phoneNumbers" rows="3" 
+                                  placeholder="Digite os números separados por vírgula ou quebra de linha&#10;Exemplo: +5511999999999, +5511888888888" required></textarea>
+                        <div class="form-text">
+                            Digite os números no formato internacional (+55...) ou nacional, separados por vírgula ou quebra de linha.
+                        </div>
+                    </div>
+
+                    <!-- Advanced Options -->
+                    <div class="card mb-3">
+                        <div class="card-header">
+                            <button class="btn btn-link p-0 text-decoration-none" type="button" 
+                                    data-bs-toggle="collapse" data-bs-target="#advancedOptions">
+                                <i class="fas fa-cog me-2"></i>
+                                Opções Avançadas
+                                <i class="fas fa-chevron-down ms-2"></i>
+                            </button>
+                        </div>
+                        <div class="collapse" id="advancedOptions">
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" id="deliveryReport" 
+                                                       name="deliveryReport" checked>
+                                                <label class="form-check-label" for="deliveryReport">
+                                                    Relatório de Entrega
+                                                </label>
+                                            </div>
+                                            <div class="form-text">
+                                                Receber confirmação quando a mensagem for entregue
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label for="simNumber" class="form-label">SIM Card</label>
+                                            <select class="form-select" id="simNumber" name="simNumber">
+                                                <option value="">Automático</option>
+                                                <option value="1">SIM 1</option>
+                                                <option value="2">SIM 2</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label for="ttl" class="form-label">TTL (segundos)</label>
+                                            <input type="number" class="form-control" id="ttl" name="ttl" 
+                                                   placeholder="Tempo limite para envio" min="1" max="86400">
+                                            <div class="form-text">
+                                                Tempo limite em segundos (máximo 24 horas)
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary" id="sendBtn">
+                            <i class="fas fa-paper-plane me-2"></i>
+                            Enviar SMS
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary" onclick="clearForm()">
+                            <i class="fas fa-eraser me-2"></i>
+                            Limpar
+                        </button>
+                        <button type="button" class="btn btn-outline-info" onclick="previewMessage()">
+                            <i class="fas fa-eye me-2"></i>
+                            Visualizar
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <!-- Quick Contacts -->
+        <div class="card mb-3">
+            <div class="card-header">
+                <h6 class="card-title mb-0">
+                    <i class="fas fa-address-book me-2"></i>
+                    Contatos Rápidos
+                </h6>
+            </div>
+            <div class="card-body">
+                {% if contacts %}
+                    <div class="list-group list-group-flush">
+                        {% for contact in contacts[:10] %}
+                        <div class="list-group-item d-flex justify-content-between align-items-center p-2">
+                            <div>
+                                <div class="fw-bold">{{ contact[0] }}</div>
+                                <small class="text-muted">{{ contact[1] }}</small>
+                            </div>
+                            <button class="btn btn-sm btn-outline-primary" 
+                                    onclick="addContact('{{ contact[1] }}')">
+                                <i class="fas fa-plus"></i>
+                            </button>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% if contacts|length > 10 %}
+                    <div class="text-center mt-2">
+                        <a href="/contacts" class="btn btn-sm btn-outline-secondary">
+                            Ver todos os contatos
+                        </a>
+                    </div>
+                    {% endif %}
+                {% else %}
+                    <div class="text-center py-3">
+                        <i class="fas fa-address-book fa-2x text-muted mb-2"></i>
+                        <p class="text-muted mb-2">Nenhum contato encontrado</p>
+                        <a href="/contacts" class="btn btn-sm btn-primary">
+                            Adicionar Contatos
+                        </a>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Message Templates -->
+        <div class="card">
+            <div class="card-header">
+                <h6 class="card-title mb-0">
+                    <i class="fas fa-file-text me-2"></i>
+                    Templates
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="list-group list-group-flush">
+                    <button class="list-group-item list-group-item-action p-2" 
+                            onclick="useTemplate('Olá! Esta é uma mensagem de teste do SMS Gateway.')">
+                        <div class="fw-bold">Mensagem de Teste</div>
+                        <small class="text-muted">Template básico para testes</small>
+                    </button>
+                    <button class="list-group-item list-group-item-action p-2" 
+                            onclick="useTemplate('Lembrete: Você tem um compromisso agendado para hoje.')">
+                        <div class="fw-bold">Lembrete</div>
+                        <small class="text-muted">Template para lembretes</small>
+                    </button>
+                    <button class="list-group-item list-group-item-action p-2" 
+                            onclick="useTemplate('Obrigado por entrar em contato conosco. Retornaremos em breve.')">
+                        <div class="fw-bold">Resposta Automática</div>
+                        <small class="text-muted">Template para respostas</small>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Preview Modal -->
+<div class="modal fade" id="previewModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Visualizar Mensagem</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Mensagem:</label>
+                    <div class="bg-light p-3 rounded" id="previewMessage"></div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Destinatários:</label>
+                    <div id="previewRecipients"></div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Configurações:</label>
+                    <ul class="list-unstyled" id="previewSettings"></ul>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                <button type="button" class="btn btn-primary" onclick="sendFromPreview()">
+                    <i class="fas fa-paper-plane me-2"></i>
+                    Enviar Agora
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Success Modal -->
+<div class="modal fade" id="successModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title">
+                    <i class="fas fa-check-circle me-2"></i>
+                    Mensagem Enviada
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="successModalBody">
+                <!-- Success content will be inserted here -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                <a href="/messages" class="btn btn-primary">Ver Mensagens</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Character counter
+    document.getElementById('message').addEventListener('input', function() {
+        const charCount = this.value.length;
+        document.getElementById('charCount').textContent = charCount;
+        
+        if (charCount > 1600) {
+            this.classList.add('is-invalid');
+        } else {
+            this.classList.remove('is-invalid');
+        }
+    });
+
+    // Add contact to phone numbers
+    function addContact(phoneNumber) {
+        const phoneNumbersField = document.getElementById('phoneNumbers');
+        const currentNumbers = phoneNumbersField.value.trim();
+        
+        if (currentNumbers) {
+            phoneNumbersField.value = currentNumbers + ', ' + phoneNumber;
+        } else {
+            phoneNumbersField.value = phoneNumber;
+        }
+        
+        showToast('Contato adicionado aos destinatários', 'success');
+    }
+
+    // Use template
+    function useTemplate(templateText) {
+        document.getElementById('message').value = templateText;
+        document.getElementById('message').dispatchEvent(new Event('input'));
+        showToast('Template aplicado', 'success');
+    }
+
+    // Clear form
+    function clearForm() {
+        document.getElementById('smsForm').reset();
+        document.getElementById('charCount').textContent = '0';
+        showToast('Formulário limpo', 'info');
+    }
+
+    // Preview message
+    function previewMessage() {
+        const message = document.getElementById('message').value.trim();
+        const phoneNumbers = document.getElementById('phoneNumbers').value.trim();
+        
+        if (!message || !phoneNumbers) {
+            showToast('Preencha a mensagem e os números de telefone', 'warning');
+            return;
+        }
+
+        // Parse phone numbers
+        const numbers = phoneNumbers.split(/[,\n]/).map(n => n.trim()).filter(n => n);
+        
+        // Update preview modal
+        document.getElementById('previewMessage').textContent = message;
+        
+        const recipientsHtml = numbers.map(num => 
+            '<span class="badge bg-secondary me-1 mb-1">' + formatPhoneNumber(num) + '</span>'
+        ).join('');
+        document.getElementById('previewRecipients').innerHTML = recipientsHtml;
+        
+        // Settings
+        const deliveryReport = document.getElementById('deliveryReport').checked;
+        const simNumber = document.getElementById('simNumber').value;
+        const ttl = document.getElementById('ttl').value;
+        
+        let settingsHtml = '<li><i class="fas fa-check-circle text-success me-2"></i>Relatório de entrega: ' + (deliveryReport ? 'Sim' : 'Não') + '</li>';
+        if (simNumber) {
+            settingsHtml += '<li><i class="fas fa-sim-card text-info me-2"></i>SIM Card: ' + simNumber + '</li>';
+        }
+        if (ttl) {
+            settingsHtml += '<li><i class="fas fa-clock text-warning me-2"></i>TTL: ' + ttl + ' segundos</li>';
+        }
+        
+        document.getElementById('previewSettings').innerHTML = settingsHtml;
+        
+        const modal = new bootstrap.Modal(document.getElementById('previewModal'));
+        modal.show();
+    }
+
+    // Send from preview
+    function sendFromPreview() {
+        const previewModal = bootstrap.Modal.getInstance(document.getElementById('previewModal'));
+        previewModal.hide();
+        sendMessage();
+    }
+
+    // Send message
+    function sendMessage() {
+        const form = document.getElementById('smsForm');
+        const sendBtn = document.getElementById('sendBtn');
+        
+        // Validate form
+        if (!form.checkValidity()) {
+            form.reportValidity();
+            return;
+        }
+
+        const message = document.getElementById('message').value.trim();
+        const phoneNumbers = document.getElementById('phoneNumbers').value.trim();
+        
+        if (!message || !phoneNumbers) {
+            showToast('Preencha todos os campos obrigatórios', 'warning');
+            return;
+        }
+
+        // Parse phone numbers
+        const numbers = phoneNumbers.split(/[,\n]/).map(n => n.trim()).filter(n => n);
+        
+        if (numbers.length === 0) {
+            showToast('Adicione pelo menos um número de telefone', 'warning');
+            return;
+        }
+
+        // Prepare data
+        const data = {
+            message: message,
+            phone_numbers: numbers,
+            with_delivery_report: document.getElementById('deliveryReport').checked
+        };
+
+        const simNumber = document.getElementById('simNumber').value;
+        if (simNumber) {
+            data.sim_number = parseInt(simNumber);
+        }
+
+        const ttl = document.getElementById('ttl').value;
+        if (ttl) {
+            data.ttl = parseInt(ttl);
+        }
+
+        // Show loading state
+        sendBtn.disabled = true;
+        sendBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Enviando...';
+
+        // Send request
+        fetch('/api/send', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(data)
+        })
+        .then(response => response.json())
+        .then(result => {
+            if (result.error) {
+                showToast('Erro: ' + result.error, 'error');
+                return;
+            }
+
+            // Show success modal
+            const successModalBody = document.getElementById('successModalBody');
+            successModalBody.innerHTML = `
+                <div class="mb-3">
+                    <p><strong>ID da Mensagem:</strong> ${result.id}</p>
+                    <p><strong>Status:</strong> ${getStatusBadge(result.state)}</p>
+                    <p><strong>Destinatários:</strong> ${result.recipients.length}</p>
+                </div>
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i>
+                    Sua mensagem foi enviada com sucesso! Você pode acompanhar o status na página de mensagens.
+                </div>
+            `;
+
+            const successModal = new bootstrap.Modal(document.getElementById('successModal'));
+            successModal.show();
+
+            // Clear form
+            clearForm();
+        })
+        .catch(error => {
+            showToast('Erro ao enviar mensagem: ' + error.message, 'error');
+        })
+        .finally(() => {
+            // Reset button state
+            sendBtn.disabled = false;
+            sendBtn.innerHTML = '<i class="fas fa-paper-plane me-2"></i>Enviar SMS';
+        });
+    }
+
+    // Form submit handler
+    document.getElementById('smsForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        sendMessage();
+    });
+</script>

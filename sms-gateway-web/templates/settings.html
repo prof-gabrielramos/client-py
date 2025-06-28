@@ -1,0 +1,349 @@
+{% extends "base.html" %}
+
+{% block title %}Configurações - SMS Gateway{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="h3 mb-0">Configurações</h1>
+    <button class="btn btn-primary" onclick="saveSettings()">
+        <i class="fas fa-save me-2"></i>
+        Salvar Alterações
+    </button>
+</div>
+
+<div class="row">
+    <div class="col-lg-8">
+        <!-- Gateway Connection Settings -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-link me-2"></i>
+                    Conexão com o Gateway
+                </h5>
+            </div>
+            <div class="card-body">
+                <form id="gatewaySettingsForm">
+                    <div class="mb-3">
+                        <label for="gatewayUrl" class="form-label">URL do Gateway *</label>
+                        <input type="url" class="form-control" id="gatewayUrl" value="{{ settings.gateway_url }}" 
+                               placeholder="http://192.168.1.100:8080" required>
+                        <div class="form-text">
+                            URL completa do seu gateway SMS Android (incluindo http:// e porta)
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="apiKey" class="form-label">Chave API</label>
+                                <input type="password" class="form-control" id="apiKey" value="{{ settings.api_key }}" 
+                                       placeholder="Sua chave de API">
+                                <div class="form-text">
+                                    Chave de API para autenticação com o gateway (se configurado)
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="deviceId" class="form-label">ID do Dispositivo</label>
+                                <input type="text" class="form-control" id="deviceId" value="{{ settings.device_id }}" 
+                                       placeholder="ID único do dispositivo">
+                                <div class="form-text">
+                                    ID único para identificar este cliente no gateway
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="verifySsl" 
+                                   {% if settings.verify_ssl %}checked{% endif %}>
+                            <label class="form-check-label" for="verifySsl">
+                                Verificar Certificado SSL
+                            </label>
+                        </div>
+                        <div class="form-text">
+                            Desative se estiver usando um certificado autoassinado no gateway
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <button type="button" class="btn btn-outline-primary" onclick="testConnection()">
+                            <i class="fas fa-plug me-2"></i>
+                            Testar Conexão
+                        </button>
+                        <div id="connectionTestResult" class="mt-2"></div>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Application Settings -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-cog me-2"></i>
+                    Configurações da Aplicação
+                </h5>
+            </div>
+            <div class="card-body">
+                <form id="appSettingsForm">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="defaultCountryCode" class="form-label">Código do País Padrão</label>
+                                <input type="text" class="form-control" id="defaultCountryCode" 
+                                       value="{{ settings.default_country_code }}" placeholder="+55">
+                                <div class="form-text">
+                                    Código do país a ser adicionado automaticamente a números sem formato internacional
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="messagesPerPage" class="form-label">Mensagens por Página</label>
+                                <select class="form-select" id="messagesPerPage">
+                                    <option value="10" {% if settings.messages_per_page == 10 %}selected{% endif %}>10</option>
+                                    <option value="25" {% if settings.messages_per_page == 25 %}selected{% endif %}>25</option>
+                                    <option value="50" {% if settings.messages_per_page == 50 %}selected{% endif %}>50</option>
+                                    <option value="100" {% if settings.messages_per_page == 100 %}selected{% endif %}>100</option>
+                                </select>
+                                <div class="form-text">
+                                    Número de mensagens exibidas por página na lista de mensagens
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="autoRefreshDashboard" 
+                                   {% if settings.auto_refresh_dashboard %}checked{% endif %}>
+                            <label class="form-check-label" for="autoRefreshDashboard">
+                                Atualização Automática do Dashboard
+                            </label>
+                        </div>
+                        <div class="form-text">
+                            Atualiza automaticamente o dashboard e a lista de mensagens a cada 30 segundos
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <!-- Security Settings -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-lock me-2"></i>
+                    Segurança
+                </h5>
+            </div>
+            <div class="card-body">
+                <form id="securitySettingsForm">
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="requireAuth" 
+                                   {% if settings.require_auth %}checked{% endif %}>
+                            <label class="form-check-label" for="requireAuth">
+                                Exigir Autenticação
+                            </label>
+                        </div>
+                        <div class="form-text">
+                            Protege o acesso à interface web com login e senha
+                        </div>
+                    </div>
+                    <div id="authSettings" {% if settings.require_auth %}style="display: block;"{% else %}style="display: none;"{% endif %}>
+                        <div class="mb-3">
+                            <label for="username" class="form-label">Nome de Usuário</label>
+                            <input type="text" class="form-control" id="username" value="{{ settings.username }}" 
+                                   {% if settings.require_auth %}required{% endif %}>
+                        </div>
+                        <div class="mb-3">
+                            <label for="currentPassword" class="form-label">Senha Atual</label>
+                            <input type="password" class="form-control" id="currentPassword" placeholder="Digite a senha atual para alterá-la">
+                            <div class="form-text">
+                                Deixe em branco para manter a senha atual
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="newPassword" class="form-label">Nova Senha</label>
+                            <input type="password" class="form-control" id="newPassword" placeholder="Digite apenas se quiser alterar">
+                        </div>
+                        <div class="mb-3">
+                            <label for="confirmPassword" class="form-label">Confirmar Nova Senha</label>
+                            <input type="password" class="form-control" id="confirmPassword" placeholder="Confirme a nova senha">
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- About Card -->
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-info-circle me-2"></i>
+                    Sobre
+                </h5>
+            </div>
+            <div class="card-body">
+                <h6>SMS Gateway Web Client</h6>
+                <p class="text-muted">Versão: {{ app_version }}</p>
+                <p class="mb-3">Interface web para o Android SMS Gateway, permitindo o envio e gerenciamento de mensagens SMS através de um dispositivo Android conectado.</p>
+                <div class="d-grid gap-2">
+                    <a href="https://github.com/android-sms-gateway/client-py" class="btn btn-outline-primary btn-sm" target="_blank">
+                        <i class="fab fa-github me-2"></i>
+                        Repositório GitHub
+                    </a>
+                    <a href="https://github.com/android-sms-gateway/client-py/issues" class="btn btn-outline-danger btn-sm" target="_blank">
+                        <i class="fas fa-bug me-2"></i>
+                        Reportar Problema
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Show/hide auth settings based on requireAuth checkbox
+    document.getElementById('requireAuth').addEventListener('change', function() {
+        const authSettings = document.getElementById('authSettings');
+        const username = document.getElementById('username');
+        
+        if (this.checked) {
+            authSettings.style.display = 'block';
+            username.setAttribute('required', 'required');
+        } else {
+            authSettings.style.display = 'none';
+            username.removeAttribute('required');
+        }
+    });
+
+    // Test gateway connection
+    function testConnection() {
+        const testResult = document.getElementById('connectionTestResult');
+        testResult.innerHTML = '<div class="spinner-border spinner-border-sm text-primary me-2" role="status"><span class="visually-hidden">Testando...</span></div> Testando conexão...';
+        
+        const gatewayUrl = document.getElementById('gatewayUrl').value;
+        const apiKey = document.getElementById('apiKey').value;
+        const verifySsl = document.getElementById('verifySsl').checked;
+        
+        const data = {
+            gateway_url: gatewayUrl,
+            api_key: apiKey,
+            verify_ssl: verifySsl
+        };
+        
+        fetch('/api/test-connection', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(data)
+        })
+        .then(response => response.json())
+        .then(result => {
+            if (result.success) {
+                testResult.innerHTML = '<div class="alert alert-success mt-2"><i class="fas fa-check-circle me-2"></i> Conexão bem-sucedida! O gateway respondeu corretamente.</div>';
+            } else {
+                testResult.innerHTML = '<div class="alert alert-danger mt-2"><i class="fas fa-exclamation-circle me-2"></i> Falha na conexão: ' + result.error + '</div>';
+            }
+        })
+        .catch(error => {
+            testResult.innerHTML = '<div class="alert alert-danger mt-2"><i class="fas fa-exclamation-circle me-2"></i> Erro ao testar conexão: ' + error.message + '</div>';
+        });
+    }
+
+    // Save settings
+    function saveSettings() {
+        const gatewaySettingsForm = document.getElementById('gatewaySettingsForm');
+        const appSettingsForm = document.getElementById('appSettingsForm');
+        const securitySettingsForm = document.getElementById('securitySettingsForm');
+        
+        // Validate forms
+        if (!gatewaySettingsForm.checkValidity() || !appSettingsForm.checkValidity() || !securitySettingsForm.checkValidity()) {
+            gatewaySettingsForm.reportValidity();
+            appSettingsForm.reportValidity();
+            securitySettingsForm.reportValidity();
+            return;
+        }
+        
+        // Validate passwords match if new password is provided
+        const requireAuth = document.getElementById('requireAuth').checked;
+        const newPassword = document.getElementById('newPassword').value;
+        const confirmPassword = document.getElementById('confirmPassword').value;
+        
+        if (requireAuth && newPassword && newPassword !== confirmPassword) {
+            showToast('As senhas não coincidem!', 'error');
+            document.getElementById('newPassword').classList.add('is-invalid');
+            document.getElementById('confirmPassword').classList.add('is-invalid');
+            return;
+        }
+        
+        // Clear validation
+        document.getElementById('newPassword').classList.remove('is-invalid');
+        document.getElementById('confirmPassword').classList.remove('is-invalid');
+        
+        // Prepare data
+        const data = {
+            gateway_url: document.getElementById('gatewayUrl').value,
+            api_key: document.getElementById('apiKey').value,
+            device_id: document.getElementById('deviceId').value,
+            verify_ssl: document.getElementById('verifySsl').checked,
+            default_country_code: document.getElementById('defaultCountryCode').value,
+            messages_per_page: parseInt(document.getElementById('messagesPerPage').value),
+            auto_refresh_dashboard: document.getElementById('autoRefreshDashboard').checked,
+            require_auth: requireAuth
+        };
+        
+        if (requireAuth) {
+            data.username = document.getElementById('username').value;
+            
+            // Only include password fields if new password is provided
+            if (newPassword) {
+                data.current_password = document.getElementById('currentPassword').value;
+                data.new_password = newPassword;
+            }
+        }
+        
+        // Show loading state
+        const saveBtn = document.querySelector('.btn-primary[onclick="saveSettings()"]');
+        saveBtn.disabled = true;
+        saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Salvando...';
+        
+        fetch('/api/settings', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(data)
+        })
+        .then(response => response.json())
+        .then(result => {
+            if (result.error) {
+                showToast('Erro ao salvar configurações: ' + result.error, 'error');
+                return;
+            }
+            
+            showToast('Configurações salvas com sucesso!', 'success');
+            
+            // If authentication was enabled or password changed, warn user about session
+            if (requireAuth && (newPassword || result.auth_changed)) {
+                setTimeout(() => {
+                    showToast('Sua sessão pode expirar devido às alterações de autenticação. Faça login novamente se necessário.', 'warning');
+                }, 1000);
+            }
+        })
+        .catch(error => {
+            showToast('Erro ao salvar configurações: ' + error.message, 'error');
+        })
+        .finally(() => {
+            saveBtn.disabled = false;
+            saveBtn.innerHTML = '<i class="fas fa-save me-2"></i>Salvar Alterações';
+        });
+    }
+</script>
+{% endblock %}

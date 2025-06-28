@@ -1,0 +1,545 @@
+{% extends "base.html" %}
+
+{% block title %}Mensagens - SMS Gateway{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="h3 mb-0">Mensagens</h1>
+    <a href="/send" class="btn btn-primary">
+        <i class="fas fa-paper-plane me-2"></i>
+        Enviar SMS
+    </a>
+</div>
+
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="card-title mb-0">
+            <i class="fas fa-envelope me-2"></i>
+            Histórico de Mensagens
+        </h5>
+        <div class="d-flex gap-2">
+            <button class="btn btn-outline-primary btn-sm" onclick="refreshMessages()">
+                <i class="fas fa-sync-alt me-2"></i>
+                Atualizar
+            </button>
+            <div class="input-group input-group-sm" style="width: 200px;">
+                <span class="input-group-text">
+                    <i class="fas fa-search"></i>
+                </span>
+                <input type="text" class="form-control" id="searchInput" placeholder="Buscar..." 
+                       onkeyup="filterMessages()">
+            </div>
+        </div>
+    </div>
+    <div class="card-body">
+        <div class="row mb-3">
+            <div class="col-md-3">
+                <select class="form-select" id="statusFilter" onchange="filterMessages()">
+                    <option value="">Todos os Status</option>
+                    <option value="pending">Pendentes</option>
+                    <option value="processed">Processando</option>
+                    <option value="sent">Enviados</option>
+                    <option value="delivered">Entregues</option>
+                    <option value="failed">Falharam</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <select class="form-select" id="dateFilter" onchange="filterMessages()">
+                    <option value="">Todas as Datas</option>
+                    <option value="today">Hoje</option>
+                    <option value="yesterday">Ontem</option>
+                    <option value="last7days">Últimos 7 Dias</option>
+                    <option value="last30days">Últimos 30 Dias</option>
+                </select>
+            </div>
+            <div class="col-md-6 text-end">
+                <div class="form-check form-switch d-inline-block mt-2">
+                    <input class="form-check-input" type="checkbox" id="autoRefresh" checked>
+                    <label class="form-check-label" for="autoRefresh">Atualização automática</label>
+                </div>
+            </div>
+        </div>
+
+        <div id="messagesTableContainer">
+            {% if messages %}
+                <div class="table-responsive">
+                    <table class="table table-hover" id="messagesTable">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Mensagem</th>
+                                <th>Destinatários</th>
+                                <th>Status</th>
+                                <th>Data</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for message in messages %}
+                            <tr data-id="{{ message[0] }}" data-status="{{ message[3].lower() }}" data-date="{{ message[4] }}">
+                                <td>{{ message[0] }}</td>
+                                <td>
+                                    <div class="text-truncate" style="max-width: 200px;" title="{{ message[1] }}">
+                                        {{ message[1] }}
+                                    </div>
+                                </td>
+                                <td>
+                                    <span class="badge bg-secondary">Múltiplos</span>
+                                </td>
+                                <td>
+                                    <span class="status-badge status-{{ message[3].lower() }}">
+                                        {% if message[3] == 'Pending' %}Pendente
+                                        {% elif message[3] == 'Processed' %}Processando
+                                        {% elif message[3] == 'Sent' %}Enviado
+                                        {% elif message[3] == 'Delivered' %}Entregue
+                                        {% elif message[3] == 'Failed' %}Falhou
+                                        {% else %}{{ message[3] }}
+                                        {% endif %}
+                                    </span>
+                                </td>
+                                <td>
+                                    <small class="text-muted">{{ message[4] }}</small>
+                                </td>
+                                <td>
+                                    <button class="btn btn-sm btn-outline-primary" onclick="viewMessageDetails('{{ message[0] }}')">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-info" onclick="resendMessage('{{ message[0] }}')">
+                                        <i class="fas fa-redo"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                <div class="row mt-3">
+                    <div class="col-md-6">
+                        <nav aria-label="Page navigation">
+                            <ul class="pagination">
+                                <li class="page-item {% if current_page == 1 %}disabled{% endif %}">
+                                    <a class="page-link" href="?page={{ current_page - 1 }}" aria-label="Previous">
+                                        <span aria-hidden="true">&laquo;</span>
+                                    </a>
+                                </li>
+                                {% for p in range(1, total_pages + 1) %}
+                                <li class="page-item {% if p == current_page %}active{% endif %}">
+                                    <a class="page-link" href="?page={{ p }}">{{ p }}</a>
+                                </li>
+                                {% endfor %}
+                                <li class="page-item {% if current_page == total_pages %}disabled{% endif %}">
+                                    <a class="page-link" href="?page={{ current_page + 1 }}" aria-label="Next">
+                                        <span aria-hidden="true">&raquo;</span>
+                                    </a>
+                                </li>
+                            </ul>
+                        </nav>
+                    </div>
+                    <div class="col-md-6 text-md-end mt-2">
+                        <p class="text-muted">Mostrando {{ start_index }}-{{ end_index }} de {{ total_messages }} mensagens</p>
+                    </div>
+                </div>
+            {% else %}
+                <div class="text-center py-5">
+                    <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
+                    <h5 class="text-muted">Nenhuma mensagem encontrada</h5>
+                    <p class="text-muted">Comece enviando sua primeira mensagem SMS.</p>
+                    <a href="/send" class="btn btn-primary">
+                        <i class="fas fa-paper-plane me-2"></i>
+                        Enviar Primeira Mensagem
+                    </a>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Message Details Modal -->
+<div class="modal fade" id="messageModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Detalhes da Mensagem</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="messageModalBody">
+                <div class="text-center">
+                    <div class="spinner-border" role="status">
+                        <span class="visually-hidden">Carregando...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Resend Modal -->
+<div class="modal fade" id="resendModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Reenviar Mensagem</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="resendModalBody">
+                <div class="text-center">
+                    <div class="spinner-border" role="status">
+                        <span class="visually-hidden">Carregando...</span>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="confirmResendBtn">
+                    <i class="fas fa-redo me-2"></i>
+                    Reenviar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let autoRefreshInterval = setInterval(refreshMessages, 30000);
+
+    // Toggle auto refresh
+    document.getElementById('autoRefresh').addEventListener('change', function() {
+        if (this.checked) {
+            autoRefreshInterval = setInterval(refreshMessages, 30000);
+        } else {
+            clearInterval(autoRefreshInterval);
+        }
+    });
+
+    // Refresh messages
+    function refreshMessages() {
+        fetch('/api/messages')
+            .then(response => response.json())
+            .then(data => {
+                // Update messages table
+                const container = document.getElementById('messagesTableContainer');
+                if (data.messages && data.messages.length > 0) {
+                    let html = `
+                        <div class="table-responsive">
+                            <table class="table table-hover" id="messagesTable">
+                                <thead>
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>Mensagem</th>
+                                        <th>Destinatários</th>
+                                        <th>Status</th>
+                                        <th>Data</th>
+                                        <th>Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                    `;
+                    
+                    data.messages.forEach(message => {
+                        html += `
+                            <tr data-id="${message[0]}" data-status="${message[3].toLowerCase()}" data-date="${message[4]}">
+                                <td>${message[0]}</td>
+                                <td>
+                                    <div class="text-truncate" style="max-width: 200px;" title="${message[1]}">
+                                        ${message[1]}
+                                    </div>
+                                </td>
+                                <td>
+                                    <span class="badge bg-secondary">Múltiplos</span>
+                                </td>
+                                <td>
+                                    <span class="status-badge status-${message[3].toLowerCase()}">
+                                        ${translateStatus(message[3])}
+                                    </span>
+                                </td>
+                                <td>
+                                    <small class="text-muted">${message[4]}</small>
+                                </td>
+                                <td>
+                                    <button class="btn btn-sm btn-outline-primary" onclick="viewMessageDetails('${message[0]}')">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-info" onclick="resendMessage('${message[0]}')">
+                                        <i class="fas fa-redo"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                        `;
+                    });
+                    
+                    html += `
+                                </tbody>
+                            </table>
+                        </div>
+                    `;
+                    
+                    if (data.pagination) {
+                        html += `
+                            <div class="row mt-3">
+                                <div class="col-md-6">
+                                    <nav aria-label="Page navigation">
+                                        <ul class="pagination">
+                                            <li class="page-item ${data.pagination.current_page === 1 ? 'disabled' : ''}">
+                                                <a class="page-link" href="?page=${data.pagination.current_page - 1}" aria-label="Previous">
+                                                    <span aria-hidden="true">&laquo;</span>
+                                                </a>
+                                            </li>
+                        `;
+                        
+                        for (let p = 1; p <= data.pagination.total_pages; p++) {
+                            html += `
+                                <li class="page-item ${p === data.pagination.current_page ? 'active' : ''}">
+                                    <a class="page-link" href="?page=${p}">${p}</a>
+                                </li>
+                            `;
+                        }
+                        
+                        html += `
+                                            <li class="page-item ${data.pagination.current_page === data.pagination.total_pages ? 'disabled' : ''}">
+                                                <a class="page-link" href="?page=${data.pagination.current_page + 1}" aria-label="Next">
+                                                    <span aria-hidden="true">&raquo;</span>
+                                                </a>
+                                            </li>
+                                        </ul>
+                                    </nav>
+                                </div>
+                                <div class="col-md-6 text-md-end mt-2">
+                                    <p class="text-muted">Mostrando ${data.pagination.start_index}-${data.pagination.end_index} de ${data.pagination.total_messages} mensagens</p>
+                                </div>
+                            </div>
+                        `;
+                    }
+                    
+                    container.innerHTML = html;
+                } else {
+                    container.innerHTML = `
+                        <div class="text-center py-5">
+                            <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
+                            <h5 class="text-muted">Nenhuma mensagem encontrada</h5>
+                            <p class="text-muted">Comece enviando sua primeira mensagem SMS.</p>
+                            <a href="/send" class="btn btn-primary">
+                                <i class="fas fa-paper-plane me-2"></i>
+                                Enviar Primeira Mensagem
+                            </a>
+                        </div>
+                    `;
+                }
+                
+                showToast('Lista de mensagens atualizada', 'info');
+            })
+            .catch(error => {
+                showToast('Erro ao atualizar mensagens: ' + error.message, 'error');
+            });
+    }
+
+    // Translate status to Portuguese
+    function translateStatus(status) {
+        const statusMap = {
+            'Pending': 'Pendente',
+            'Processed': 'Processando',
+            'Sent': 'Enviado',
+            'Delivered': 'Entregue',
+            'Failed': 'Falhou'
+        };
+        return statusMap[status] || status;
+    }
+
+    // Filter messages
+    function filterMessages() {
+        const searchText = document.getElementById('searchInput').value.toLowerCase();
+        const statusFilter = document.getElementById('statusFilter').value;
+        const dateFilter = document.getElementById('dateFilter').value;
+        
+        const rows = document.querySelectorAll('#messagesTable tbody tr');
+        
+        // Calculate date boundaries
+        const now = new Date();
+        let dateStart = null;
+        let dateEnd = null;
+        
+        if (dateFilter === 'today') {
+            dateStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            dateEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+        } else if (dateFilter === 'yesterday') {
+            dateStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+            dateEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        } else if (dateFilter === 'last7days') {
+            dateStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7);
+            dateEnd = now;
+        } else if (dateFilter === 'last30days') {
+            dateStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 30);
+            dateEnd = now;
+        }
+        
+        rows.forEach(row => {
+            const id = row.cells[0].textContent.toLowerCase();
+            const message = row.cells[1].textContent.toLowerCase();
+            const status = row.dataset.status;
+            const dateStr = row.dataset.date;
+            let show = true;
+            
+            // Apply search filter
+            if (searchText && !id.includes(searchText) && !message.includes(searchText)) {
+                show = false;
+            }
+            
+            // Apply status filter
+            if (statusFilter && status !== statusFilter) {
+                show = false;
+            }
+            
+            // Apply date filter
+            if (dateFilter && dateStart && dateEnd) {
+                const date = new Date(dateStr);
+                if (date < dateStart || date > dateEnd) {
+                    show = false;
+                }
+            }
+            
+            row.style.display = show ? '' : 'none';
+        });
+    }
+
+    // View message details
+    function viewMessageDetails(messageId) {
+        const modal = new bootstrap.Modal(document.getElementById('messageModal'));
+        const modalBody = document.getElementById('messageModalBody');
+        
+        modalBody.innerHTML = '<div class="text-center"><div class="spinner-border" role="status"><span class="visually-hidden">Carregando...</span></div></div>';
+        
+        modal.show();
+        
+        fetch('/api/message/' + messageId)
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    modalBody.innerHTML = '<div class="alert alert-danger"><i class="fas fa-exclamation-circle me-2"></i>' + data.error + '</div>';
+                    return;
+                }
+                
+                let recipientsHtml = '';
+                if (data.recipients && data.recipients.length > 0) {
+                    recipientsHtml = data.recipients.map(recipient => 
+                        '<tr><td>' + formatPhoneNumber(recipient.phoneNumber) + '</td><td>' + getStatusBadge(recipient.state) + '</td><td>' + (recipient.error || '-') + '</td></tr>'
+                    ).join('');
+                }
+                
+                modalBody.innerHTML = '<div class="row"><div class="col-md-6"><h6>Informações da Mensagem</h6><p><strong>ID:</strong> ' + data.id + '</p><p><strong>Status:</strong> ' + getStatusBadge(data.state) + '</p><p><strong>Mensagem:</strong></p><div class="bg-light p-3 rounded">' + (data.message || 'N/A') + '</div></div><div class="col-md-6"><h6>Destinatários</h6><div class="table-responsive"><table class="table table-sm"><thead><tr><th>Telefone</th><th>Status</th><th>Erro</th></tr></thead><tbody>' + recipientsHtml + '</tbody></table></div></div></div>';
+            })
+            .catch(error => {
+                modalBody.innerHTML = '<div class="alert alert-danger"><i class="fas fa-exclamation-circle me-2"></i>Erro ao carregar detalhes: ' + error.message + '</div>';
+            });
+    }
+
+    // Resend message
+    function resendMessage(messageId) {
+        const modal = new bootstrap.Modal(document.getElementById('resendModal'));
+        const modalBody = document.getElementById('resendModalBody');
+        const confirmBtn = document.getElementById('confirmResendBtn');
+        
+        modalBody.innerHTML = '<div class="text-center"><div class="spinner-border" role="status"><span class="visually-hidden">Carregando...</span></div></div>';
+        confirmBtn.disabled = true;
+        
+        modal.show();
+        
+        fetch('/api/message/' + messageId)
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    modalBody.innerHTML = '<div class="alert alert-danger"><i class="fas fa-exclamation-circle me-2"></i>' + data.error + '</div>';
+                    return;
+                }
+                
+                modalBody.innerHTML = `
+                    <p>Você está prestes a reenviar esta mensagem para todos os destinatários originais.</p>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Mensagem:</label>
+                        <div class="bg-light p-3 rounded">${data.message || 'N/A'}</div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Destinatários:</label>
+                        <div class="table-responsive">
+                            <table class="table table-sm">
+                                <thead>
+                                    <tr>
+                                        <th>Telefone</th>
+                                        <th>Status Original</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${data.recipients.map(recipient => 
+                                        `<tr><td>${formatPhoneNumber(recipient.phoneNumber)}</td><td>${getStatusBadge(recipient.state)}</td></tr>`
+                                    ).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        Esta ação criará uma nova mensagem com os mesmos parâmetros da original.
+                    </div>
+                `;
+                
+                confirmBtn.disabled = false;
+                confirmBtn.onclick = function() {
+                    confirmResend(messageId, data);
+                };
+            })
+            .catch(error => {
+                modalBody.innerHTML = '<div class="alert alert-danger"><i class="fas fa-exclamation-circle me-2"></i>Erro ao carregar detalhes: ' + error.message + '</div>';
+            });
+    }
+
+    // Confirm resend
+    function confirmResend(messageId, originalData) {
+        const confirmBtn = document.getElementById('confirmResendBtn');
+        confirmBtn.disabled = true;
+        confirmBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Reenviando...';
+        
+        // Prepare data for resend
+        const data = {
+            message: originalData.message,
+            phone_numbers: originalData.recipients.map(r => r.phoneNumber),
+            with_delivery_report: originalData.withDeliveryReport || false
+        };
+        
+        if (originalData.simNumber) {
+            data.sim_number = originalData.simNumber;
+        }
+        
+        if (originalData.ttl) {
+            data.ttl = originalData.ttl;
+        }
+        
+        // Send request
+        fetch('/api/send', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(data)
+        })
+        .then(response => response.json())
+        .then(result => {
+            if (result.error) {
+                showToast('Erro ao reenviar: ' + result.error, 'error');
+                return;
+            }
+            
+            showToast('Mensagem reenviada com sucesso! ID: ' + result.id, 'success');
+            const modal = bootstrap.Modal.getInstance(document.getElementById('resendModal'));
+            modal.hide();
+            refreshMessages();
+        })
+        .catch(error => {
+            showToast('Erro ao reenviar mensagem: ' + error.message, 'error');
+        })
+        .finally(() => {
+            confirmBtn.disabled = false;
+            confirmBtn.innerHTML = '<i class="fas fa-redo me-2"></i>Reenviar';
+        });
+    }
+</script>
+{% endblock %}

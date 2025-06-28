@@ -1,0 +1,255 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Python/Flask Development Rules
+
+## Key Principles
+- Write concise, technical responses with accurate Python examples
+- Use functional, declarative programming; avoid classes where possible except for Flask views
+- Prefer iteration and modularization over code duplication
+- Use descriptive variable names with auxiliary verbs (e.g., `is_active`, `has_permission`)
+- Use lowercase with underscores for directories and files (e.g., `blueprints/user_routes.py`)
+- Favor named exports for routes and utility functions
+- Use the Receive an Object, Return an Object (RORO) pattern where applicable
+
+## Python/Flask Guidelines
+
+### Function Definitions and Type Hints
+- Use `def` for function definitions
+- Use type hints for all function signatures where possible
+- Example:
+```python
+def create_user(user_data: dict) -> dict:
+    """Create a new user and return user info."""
+    if not user_data.get('email'):
+        return {'error': 'Email is required'}
+    
+    # Happy path last
+    return {'user_id': 123, 'email': user_data['email']}
+```
+
+### File Structure
+- Flask app initialization: [app.py](mdc:sms-gateway-web/app.py)
+- Blueprints for modular organization
+- Models for data structures
+- Utilities for helper functions
+- Config for environment-specific settings
+
+### Error Handling and Validation
+- Handle errors and edge cases at the beginning of functions
+- Use early returns for error conditions to avoid deeply nested if statements
+- Place the happy path last in the function for improved readability
+- Avoid unnecessary else statements; use the if-return pattern instead
+- Use guard clauses to handle preconditions and invalid states early
+- Implement proper error logging and user-friendly error messages
+- Use custom error types or error factories for consistent error handling
+
+### Conditional Statements
+- Avoid unnecessary curly braces in conditional statements
+- For single-line statements in conditionals, omit curly braces
+- Use concise, one-line syntax for simple conditional statements
+- Example:
+```python
+if not user_data: return {'error': 'No data provided'}
+if user_exists: return {'error': 'User already exists'}
+
+# Happy path
+return create_user(user_data)
+```
+
+## Dependencies
+- Flask
+- Flask-RESTful (for RESTful API development)
+- Flask-SQLAlchemy (for ORM)
+- Flask-Migrate (for database migrations)
+- Marshmallow (for serialization/deserialization)
+- Flask-JWT-Extended (for JWT authentication)
+
+## Flask-Specific Guidelines
+
+### Application Factory Pattern
+```python
+def create_app(config_name: str = 'default') -> Flask:
+    """Application factory for better modularity and testing."""
+    app = Flask(__name__)
+    app.config.from_object(config[config_name])
+    
+    # Initialize extensions
+    db.init_app(app)
+    migrate.init_app(app, db)
+    jwt.init_app(app)
+    
+    # Register blueprints
+    from .blueprints import auth_bp, api_bp
+    app.register_blueprint(auth_bp)
+    app.register_blueprint(api_bp)
+    
+    return app
+```
+
+### Blueprint Organization
+- Use Flask Blueprints for better code organization
+- Organize routes by feature or domain
+- Example structure:
+```
+blueprints/
+├── auth_routes.py
+├── user_routes.py
+├── message_routes.py
+└── webhook_routes.py
+```
+
+### RESTful API Development
+- Use Flask-RESTful for building RESTful APIs with class-based views
+- Implement proper HTTP status codes
+- Use consistent response formats
+
+### Error Handling
+- Implement custom error handlers for different types of exceptions
+- Use Flask's before_request, after_request, and teardown_request decorators
+- Example:
+```python
+@app.errorhandler(404)
+def not_found(error):
+    return {'error': 'Resource not found'}, 404
+
+@app.errorhandler(500)
+def internal_error(error):
+    return {'error': 'Internal server error'}, 500
+```
+
+### Configuration Management
+- Use Flask's config object for managing different configurations
+- Use environment variables for sensitive information
+- Example:
+```python
+class Config:
+    SECRET_KEY = os.environ.get('SECRET_KEY') or 'dev-key'
+    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL')
+    SQLALCHEMY_TRACK_MODIFICATIONS = False
+```
+
+### Logging
+- Implement proper logging using Flask's app.logger
+- Use structured logging for better debugging
+- Example:
+```python
+app.logger.info('User created successfully', extra={'user_id': user.id})
+app.logger.error('Database connection failed', exc_info=True)
+```
+
+## Performance Optimization
+
+### Caching
+- Use Flask-Caching for caching frequently accessed data
+- Implement proper cache invalidation strategies
+
+### Database Optimization
+- Implement database query optimization techniques
+- Use eager loading and proper indexing
+- Use connection pooling for database connections
+- Implement proper database session management
+
+### Background Tasks
+- Use background tasks for time-consuming operations
+- Consider Celery with Flask for complex async operations
+
+## Database Interaction
+
+### SQLAlchemy Usage
+- Use Flask-SQLAlchemy for ORM operations
+- Implement database migrations using Flask-Migrate
+- Use SQLAlchemy's session management properly
+- Example:
+```python
+def get_user_by_id(user_id: int) -> Optional[User]:
+    """Get user by ID with proper session management."""
+    try:
+        return User.query.get(user_id)
+    except SQLAlchemyError as e:
+        app.logger.error(f"Database error: {e}")
+        return None
+```
+
+## Serialization and Validation
+
+### Marshmallow Schemas
+- Use Marshmallow for object serialization/deserialization
+- Create schema classes for each model
+- Example:
+```python
+class UserSchema(ma.Schema):
+    id = ma.Int(dump_only=True)
+    email = ma.Email(required=True)
+    username = ma.Str(required=True)
+    
+    class Meta:
+        fields = ('id', 'email', 'username')
+```
+
+## Authentication and Authorization
+
+### JWT Implementation
+- Implement JWT-based authentication using Flask-JWT-Extended
+- Use decorators for protecting routes
+- Example:
+```python
+@app.route('/protected')
+@jwt_required()
+def protected_route():
+    current_user_id = get_jwt_identity()
+    return {'message': f'Hello user {current_user_id}'}
+```
+
+## Testing
+
+### Test Structure
+- Write unit tests using pytest
+- Use Flask's test client for integration testing
+- Implement test fixtures for database and application setup
+- Example:
+```python
+def test_create_user(client):
+    """Test user creation endpoint."""
+    response = client.post('/api/users', json={
+        'email': 'test@example.com',
+        'username': 'testuser'
+    })
+    assert response.status_code == 201
+    assert 'user_id' in response.json
+```
+
+## API Documentation
+
+### Swagger/OpenAPI
+- Use Flask-RESTX or Flasgger for Swagger/OpenAPI documentation
+- Ensure all endpoints are properly documented
+- Include request/response schemas
+
+## Deployment
+
+### WSGI Server
+- Use Gunicorn or uWSGI as WSGI HTTP Server
+- Implement proper logging and monitoring in production
+- Use environment variables for configuration
+
+### Docker Support
+- Reference existing Docker setup: [Dockerfile](mdc:sms-gateway-web/Dockerfile)
+- Reference docker-compose: [docker-compose.yml](mdc:sms-gateway-web/docker-compose.yml)
+
+## Key Conventions
+
+1. Use Flask's application context and request context appropriately
+2. Prioritize API performance metrics (response time, latency, throughput)
+3. Structure the application with clear separation of concerns
+4. Use environment variables for configuration management
+5. Reference existing project structure: [app.py](mdc:sms-gateway-web/app.py), [run.py](mdc:sms-gateway-web/run.py)
+
+## Project-Specific References
+- Main Flask application: [app.py](mdc:sms-gateway-web/app.py)
+- Application entry point: [run.py](mdc:sms-gateway-web/run.py)
+- Dependencies: [requirements.txt](mdc:sms-gateway-web/requirements.txt)
+- Project configuration: [pyproject.toml](mdc:pyproject.toml)
+- Testing: [tests/](mdc:tests)

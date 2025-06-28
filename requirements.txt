@@ -1,0 +1,5 @@
+sqlite3
+base64
+flask
+werkzeug
+requests
