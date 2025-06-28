@@ -14,6 +14,10 @@ wheel = "*"
 twine = "*"
 build = "*"
 importlib-metadata = "*"
+mkdocs = "*"
+mkdocs-material = "*"
+types-requests = "*"
+requests = "*" # Adicionado para garantir disponibilidade nos testes
 
 [requires]
 python_version = "3"

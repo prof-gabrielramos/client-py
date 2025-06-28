@@ -1,0 +1,74 @@
+site_name: SMS Gateway Client & Web Interface
+site_url: https://github.com/prof-gabrielramos/client-py
+nav:
+  - Home: index.md
+  - "Guia de Início Rápido": getting-started.md
+  - "Interface Web":
+    - "Visão Geral": web-interface/index.md
+    - "Instalação e Execução": web-interface/installation.md
+    - "Configuração": web-interface/configuration.md
+    - "Uso": web-interface/usage.md
+  - "Cliente Python API":
+    - "Visão Geral": api-client/index.md
+    - "Instalação": api-client/installation.md
+    - "Primeiros Passos": api-client/first-steps.md
+    - "Guia do Cliente": api-client/client-guide.md
+    - "Criptografia": api-client/encryption.md
+  - "Deployment":
+    - "Visão Geral": deployment/index.md
+    - "Docker (Geral)": deployment/docker.md
+    - "Coolify": deployment/coolify.md
+    - "VPS com Portainer + Traefik": deployment/vps-portainer-traefik.md
+  - "Guia do Desenvolvedor": developer-guide.md
+  - "Licença": license.md
+
+theme:
+  name: material
+  language: pt
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - toc.integrate
+    - navigation.top
+    - search.suggest
+    - search.highlight
+    - content.tabs.link
+    - content.code.annotation
+    - content.code.copy
+  palette:
+    - scheme: default
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+      primary: indigo
+      accent: pink
+    - scheme: slate
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+      primary: blue
+      accent: lime
+
+extra_css:
+  - stylesheets/extra.css
+
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences
+  - admonition
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+
+plugins:
+  - search
+#  - minify:
+#      minify_html: true # Descomente se precisar minificar o HTML
+
+# copyright: Copyright &copy; 2024 Seu Nome ou Organização # Descomente e personalize se desejar
