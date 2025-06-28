@@ -12,65 +12,111 @@ Este guia fornece informações essenciais para desenvolvedores que trabalham ne
 
 ## Instruções de configuração
 
-Para configurar o ambiente de desenvolvimento, siga estas etapas:
+Existem duas maneiras principais de configurar o ambiente de desenvolvimento:
+
+**1. Usando Docker (Recomendado para a Interface Web)**
+
+Esta é a forma recomendada para trabalhar com a `sms-gateway-web`, pois garante um ambiente consistente.
+
+*   **Pré-requisitos:**
+    *   Docker instalado: [Instalar Docker](https://docs.docker.com/get-docker/)
+    *   Docker Compose instalado: [Instalar Docker Compose](https://docs.docker.com/compose/install/)
+*   **Passos:**
+    1.  Clone o repositório:
+        ```bash
+        git clone https://github.com/android-sms-gateway/client-py.git # Ou a URL do seu fork
+        cd client-py/sms-gateway-web
+        ```
+    2.  Inicie os serviços com Docker Compose:
+        ```bash
+        docker-compose up --build
+        ```
+        Isso irá construir a imagem Docker (se ainda não existir) e iniciar o container da aplicação web.
+    3.  A interface web estará acessível em `http://localhost:5000`.
+    4.  O diretório `sms-gateway-web/config` no seu host é mapeado para `/root/.sms-gateway-web` no container, persistindo a configuração e o banco de dados SQLite.
+    5.  Para parar os serviços:
+        ```bash
+        docker-compose down
+        ```
+
+**2. Configuração Manual (Principalmente para a biblioteca `android-sms-gateway`)**
+
+Para desenvolver ou testar a biblioteca cliente Python (`android-sms-gateway`) diretamente, ou se você não quiser usar Docker para a interface web.
 
 1.  **Clone o repositório:**
     ```bash
-    git clone <URL_DO_REPOSITORIO>
-    cd <NOME_DO_REPOSITORIO>
+    git clone https://github.com/android-sms-gateway/client-py.git # Ou a URL do seu fork
+    cd client-py
     ```
 
-2.  **Instale as dependências:**
-    *(Supondo um projeto Python com um arquivo `requirements.txt`)*
+2.  **Crie e ative um ambiente virtual Python:**
     ```bash
-    python -m venv venv
-    source venv/bin/activate  # No Windows use `venv\Scripts\activate`
-    pip install -r requirements.txt
+    python3 -m venv venv
+    source venv/bin/activate  # No Windows: venv\Scripts\activate
     ```
-    *(Adapte esta seção para as linguagens e gerenciadores de pacotes específicos do projeto, por exemplo, Node.js/npm, Java/Maven, Ruby/Bundler, etc.)*
 
-3.  **Configuração do Banco de Dados (se aplicável):**
-    *   Detalhe as etapas para configurar o banco de dados local.
-    *   Inclua informações sobre como criar o banco de dados, executar migrações e popular dados iniciais.
-    *   Exemplo:
+3.  **Instale as dependências:**
+    *   Para a biblioteca cliente e desenvolvimento geral:
         ```bash
-        # Exemplo para um projeto Django
-        python manage.py migrate
-        python manage.py loaddata initial_data.json
+        pip install -e ".[dev,requests,encryption]"
         ```
-
-4.  **Variáveis de Ambiente:**
-    *   Explique quais variáveis de ambiente são necessárias.
-    *   Indique como configurá-las (por exemplo, copiando um arquivo `.env.example` para `.env` e preenchendo os valores).
-    *   Exemplo:
-        ```
-        cp .env.example .env
-        # Abra .env e configure as variáveis necessárias como:
-        # DATABASE_URL=...
-        # SECRET_KEY=...
-        # DEBUG=True
-        ```
-
-5.  **Ferramentas Adicionais (Opcional):**
-    *   Liste quaisquer outras ferramentas que os desenvolvedores possam precisar instalar (linters, formatadores, IDEs específicos ou plugins).
-    *   Exemplo:
-        *   `pylint` para linting de Python.
-        *   `prettier` para formatação de código frontend.
-
-6.  **Verifique a Configuração:**
-    *   Forneça um comando simples para verificar se tudo está configurado corretamente (por exemplo, executar testes ou iniciar o servidor de desenvolvimento).
-    *   Exemplo:
+    *   Se for trabalhar na interface web (`sms-gateway-web`) manualmente:
         ```bash
-        # Exemplo para um projeto Django
-        python manage.py runserver
-        ```
-        ou
-        ```bash
-        # Exemplo para executar testes
-        pytest
+        pip install -r sms-gateway-web/requirements.txt
         ```
 
-Certifique-se de que todas as ferramentas e versões de linguagem especificadas no projeto (por exemplo, no `README.md` ou em um arquivo de versão como `.python-version`) sejam respeitadas.
+4.  **Variáveis de Ambiente (para a biblioteca cliente):**
+    Para usar os exemplos ou testes da biblioteca cliente que se comunicam com a API real do SMS Gateway, configure:
+    ```bash
+    export ANDROID_SMS_GATEWAY_LOGIN="seu_usuario_api"
+    export ANDROID_SMS_GATEWAY_PASSWORD="sua_senha_api"
+    ```
+    Considere usar um arquivo `.env` com `python-dotenv` para gerenciar isso localmente (não comite o arquivo `.env`).
+
+5.  **Executando a Interface Web Manualmente (sem Docker):**
+    Se você instalou as dependências da `sms-gateway-web` manualmente:
+    ```bash
+    cd sms-gateway-web
+    python run.py
+    ```
+    Acesse em `http://localhost:5000`.
+
+**Ferramentas Adicionais Importantes:**
+
+*   **Linters e Formatadores (Black, Flake8, iSort):**
+    Estão configurados no `Pipfile` e `pyproject.toml`. Use-os para manter a qualidade do código.
+    ```bash
+    pip install black flake8 isort
+    black .
+    flake8 .
+    isort .
+    ```
+    Ou, se estiver usando o ambiente `dev` do `Pipfile`: `pipenv run black .`, etc.
+    Recomenda-se configurar seu editor para usar essas ferramentas automaticamente.
+
+*   **Pytest para Testes:**
+    ```bash
+    pip install pytest pytest-cov
+    pytest
+    ```
+
+*   **MkDocs para Documentação:**
+    ```bash
+    pip install mkdocs mkdocs-material
+    ```
+    Para construir e servir a documentação localmente (execute na raiz do projeto):
+    ```bash
+    mkdocs serve
+    ```
+    Acesse em `http://localhost:8000`.
+
+**Verificando a Configuração:**
+*   Para a biblioteca cliente: Execute `pytest` na raiz do projeto.
+*   Para a interface web (Docker): Após `docker-compose up --build` em `sms-gateway-web/`, acesse `http://localhost:5000`.
+*   Para a interface web (Manual): Em `sms-gateway-web/`, após `python run.py`, acesse `http://localhost:5000`.
+*   Para documentação: Após `mkdocs serve` na raiz, acesse `http://localhost:8000`.
+
+Certifique-se de que todas as ferramentas e versões de linguagem especificadas no projeto (Python 3.9+) sejam respeitadas.
 
 ## Visão geral da estrutura do projeto
 

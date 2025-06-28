@@ -9,12 +9,10 @@ class BaseEncryptor(abc.ABC):
         self.iterations = iterations
 
     @abc.abstractmethod
-    def encrypt(self, cleartext: str) -> str:
-        ...
+    def encrypt(self, cleartext: str) -> str: ...
 
     @abc.abstractmethod
-    def decrypt(self, encrypted: str) -> str:
-        ...
+    def decrypt(self, encrypted: str) -> str: ...
 
 
 _Encryptor: t.Optional[t.Type[BaseEncryptor]] = None

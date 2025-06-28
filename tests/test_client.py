@@ -1,4 +1,5 @@
 import os
+
 import pytest
 from requests import HTTPError
 
@@ -25,12 +26,15 @@ def client():
 
     :yields: An instance of `APIClient`.
     """
-    with RequestsHttpClient() as h, APIClient(
-        os.environ.get("API_LOGIN") or "test",
-        os.environ.get("API_PASSWORD") or "test",
-        base_url=os.environ.get("API_BASE_URL") or DEFAULT_URL,
-        http=h,
-    ) as c:
+    with (
+        RequestsHttpClient() as h,
+        APIClient(
+            os.environ.get("API_LOGIN") or "test",
+            os.environ.get("API_PASSWORD") or "test",
+            base_url=os.environ.get("API_BASE_URL") or DEFAULT_URL,
+            http=h,
+        ) as c,
+    ):
         yield c
 
 

@@ -279,15 +279,76 @@ if not login or not password:
     raise ValueError("Credenciais não configuradas!")
 ```
 
-## 📚 Documentação
+## 📦 Executando com Docker (Interface Web)
 
-### Documentação da API
+A interface web `sms-gateway-web` pode ser facilmente executada usando Docker e Docker Compose.
 
-Para documentação completa da API, incluindo todos os métodos disponíveis, esquemas de requisição/resposta e códigos de erro, acesse:
+1.  **Navegue até o diretório `sms-gateway-web`**:
+    ```bash
+    cd sms-gateway-web
+    ```
 
-📘 **[Documentação Oficial da API](https://docs.sms-gate.app/integration/api/)**
+2.  **Construa e execute o container Docker**:
+    ```bash
+    docker-compose up --build
+    ```
+    A interface web estará acessível em `http://localhost:5000`.
 
-### Documentação da Biblioteca
+    Para executar em segundo plano (detached mode):
+    ```bash
+    docker-compose up --build -d
+    ```
+
+3.  **Parar os containers**:
+    ```bash
+    docker-compose down
+    ```
+
+A configuração e o banco de dados da interface web são persistidos no volume `./config` dentro do diretório `sms-gateway-web`, que é montado em `/root/.sms-gateway-web` no container.
+
+## 🚀 Deploy
+
+Consulte a documentação completa para guias detalhados de deploy:
+- **[Documentação de Deploy](./docs/deployment.md)** (Será criada com MkDocs)
+
+Brevemente:
+
+### Coolify
+- Configure seu projeto no Coolify apontando para este repositório.
+- Use o `sms-gateway-web/Dockerfile` e `sms-gateway-web/docker-compose.yml` como base para a configuração do serviço.
+- Certifique-se de configurar as variáveis de ambiente necessárias e o mapeamento de volumes persistentes.
+
+### VPS com Portainer + Traefik
+1.  **Prepare sua VPS**: Instale Docker, Docker Compose, Portainer e Traefik.
+2.  **Configure o Traefik**: Para lidar com SSL e roteamento de domínio.
+3.  **Clone o repositório na VPS**.
+4.  **Use Portainer para adicionar um novo "Stack"**:
+    *   Aponte para o arquivo `sms-gateway-web/docker-compose.yml`.
+    *   Ajuste as `labels` do Traefik no `docker-compose.yml` para seu domínio.
+    *   Configure as variáveis de ambiente e volumes conforme necessário.
+5.  **Deploy o Stack**.
+
+## 📚 Documentação Completa (MkDocs)
+
+Uma documentação mais detalhada e navegável está disponível (ou será criada em breve) usando MkDocs. Para visualizar:
+
+1.  **Instale MkDocs e o tema Material**:
+    ```bash
+    pip install mkdocs mkdocs-material
+    ```
+2.  **Construa e sirva a documentação**:
+    ```bash
+    mkdocs serve
+    ```
+    Acesse em `http://localhost:8000`.
+
+### Documentação da API (Cliente Python)
+
+Para documentação completa da API do cliente Python, incluindo todos os métodos disponíveis, esquemas de requisição/resposta e códigos de erro, acesse:
+
+📘 **[Documentação Oficial da API SMS Gateway](https://docs.sms-gate.app/integration/api/)**
+
+### Documentação da Biblioteca Cliente Python
 
 - 📖 [Guia de Instalação](https://docs.sms-gate.app/integration/python/)
 - 🔐 [Guia de Criptografia](https://docs.sms-gate.app/privacy/encryption/)
