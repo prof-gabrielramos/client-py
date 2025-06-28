@@ -389,3 +389,4 @@ Este projeto está licenciado sob a **Licença Apache 2.0** - veja o arquivo [LI
 ---
 
 **Nota**: Android é uma marca registrada da Google LLC. Este projeto não é afiliado nem endossado pela Google.
+![CodeRabbit Pull Request Reviews](https://img.shields.io/coderabbit/prs/github/prof-gabrielramos/client-py?utm_source=oss&utm_medium=github&utm_campaign=prof-gabrielramos%2Fclient-py&labelColor=171717&color=FF570A&link=https%3A%2F%2Fcoderabbit.ai&label=CodeRabbit+Reviews)
