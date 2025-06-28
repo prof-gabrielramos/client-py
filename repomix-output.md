@@ -34,6 +34,11 @@ The content is organized as follows:
 
 # Directory Structure
 ```
+.cursor/
+  rules/
+    api-development-patterns.mdc
+    python-flask-development.mdc
+    testing-and-quality.mdc
 .github/
   workflows/
     close-issues.yml
@@ -59,6 +64,8 @@ sms-gateway-web/
     settings.html
     webhooks.html
   app.py
+  docker-compose.yml
+  Dockerfile
   README.md
   requirements.txt
   run.py
@@ -78,6 +85,1293 @@ requirements.txt
 ```
 
 # Files
+
+## File: .cursor/rules/api-development-patterns.mdc
+````
+---
+description:
+globs:
+alwaysApply: false
+---
+````
+
+## File: .cursor/rules/python-flask-development.mdc
+````
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Python/Flask Development Rules
+
+## Key Principles
+- Write concise, technical responses with accurate Python examples
+- Use functional, declarative programming; avoid classes where possible except for Flask views
+- Prefer iteration and modularization over code duplication
+- Use descriptive variable names with auxiliary verbs (e.g., `is_active`, `has_permission`)
+- Use lowercase with underscores for directories and files (e.g., `blueprints/user_routes.py`)
+- Favor named exports for routes and utility functions
+- Use the Receive an Object, Return an Object (RORO) pattern where applicable
+
+## Python/Flask Guidelines
+
+### Function Definitions and Type Hints
+- Use `def` for function definitions
+- Use type hints for all function signatures where possible
+- Example:
+```python
+def create_user(user_data: dict) -> dict:
+    """Create a new user and return user info."""
+    if not user_data.get('email'):
+        return {'error': 'Email is required'}
+    
+    # Happy path last
+    return {'user_id': 123, 'email': user_data['email']}
+```
+
+### File Structure
+- Flask app initialization: [app.py](mdc:sms-gateway-web/app.py)
+- Blueprints for modular organization
+- Models for data structures
+- Utilities for helper functions
+- Config for environment-specific settings
+
+### Error Handling and Validation
+- Handle errors and edge cases at the beginning of functions
+- Use early returns for error conditions to avoid deeply nested if statements
+- Place the happy path last in the function for improved readability
+- Avoid unnecessary else statements; use the if-return pattern instead
+- Use guard clauses to handle preconditions and invalid states early
+- Implement proper error logging and user-friendly error messages
+- Use custom error types or error factories for consistent error handling
+
+### Conditional Statements
+- Avoid unnecessary curly braces in conditional statements
+- For single-line statements in conditionals, omit curly braces
+- Use concise, one-line syntax for simple conditional statements
+- Example:
+```python
+if not user_data: return {'error': 'No data provided'}
+if user_exists: return {'error': 'User already exists'}
+
+# Happy path
+return create_user(user_data)
+```
+
+## Dependencies
+- Flask
+- Flask-RESTful (for RESTful API development)
+- Flask-SQLAlchemy (for ORM)
+- Flask-Migrate (for database migrations)
+- Marshmallow (for serialization/deserialization)
+- Flask-JWT-Extended (for JWT authentication)
+
+## Flask-Specific Guidelines
+
+### Application Factory Pattern
+```python
+def create_app(config_name: str = 'default') -> Flask:
+    """Application factory for better modularity and testing."""
+    app = Flask(__name__)
+    app.config.from_object(config[config_name])
+    
+    # Initialize extensions
+    db.init_app(app)
+    migrate.init_app(app, db)
+    jwt.init_app(app)
+    
+    # Register blueprints
+    from .blueprints import auth_bp, api_bp
+    app.register_blueprint(auth_bp)
+    app.register_blueprint(api_bp)
+    
+    return app
+```
+
+### Blueprint Organization
+- Use Flask Blueprints for better code organization
+- Organize routes by feature or domain
+- Example structure:
+```
+blueprints/
+├── auth_routes.py
+├── user_routes.py
+├── message_routes.py
+└── webhook_routes.py
+```
+
+### RESTful API Development
+- Use Flask-RESTful for building RESTful APIs with class-based views
+- Implement proper HTTP status codes
+- Use consistent response formats
+
+### Error Handling
+- Implement custom error handlers for different types of exceptions
+- Use Flask's before_request, after_request, and teardown_request decorators
+- Example:
+```python
+@app.errorhandler(404)
+def not_found(error):
+    return {'error': 'Resource not found'}, 404
+
+@app.errorhandler(500)
+def internal_error(error):
+    return {'error': 'Internal server error'}, 500
+```
+
+### Configuration Management
+- Use Flask's config object for managing different configurations
+- Use environment variables for sensitive information
+- Example:
+```python
+class Config:
+    SECRET_KEY = os.environ.get('SECRET_KEY') or 'dev-key'
+    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL')
+    SQLALCHEMY_TRACK_MODIFICATIONS = False
+```
+
+### Logging
+- Implement proper logging using Flask's app.logger
+- Use structured logging for better debugging
+- Example:
+```python
+app.logger.info('User created successfully', extra={'user_id': user.id})
+app.logger.error('Database connection failed', exc_info=True)
+```
+
+## Performance Optimization
+
+### Caching
+- Use Flask-Caching for caching frequently accessed data
+- Implement proper cache invalidation strategies
+
+### Database Optimization
+- Implement database query optimization techniques
+- Use eager loading and proper indexing
+- Use connection pooling for database connections
+- Implement proper database session management
+
+### Background Tasks
+- Use background tasks for time-consuming operations
+- Consider Celery with Flask for complex async operations
+
+## Database Interaction
+
+### SQLAlchemy Usage
+- Use Flask-SQLAlchemy for ORM operations
+- Implement database migrations using Flask-Migrate
+- Use SQLAlchemy's session management properly
+- Example:
+```python
+def get_user_by_id(user_id: int) -> Optional[User]:
+    """Get user by ID with proper session management."""
+    try:
+        return User.query.get(user_id)
+    except SQLAlchemyError as e:
+        app.logger.error(f"Database error: {e}")
+        return None
+```
+
+## Serialization and Validation
+
+### Marshmallow Schemas
+- Use Marshmallow for object serialization/deserialization
+- Create schema classes for each model
+- Example:
+```python
+class UserSchema(ma.Schema):
+    id = ma.Int(dump_only=True)
+    email = ma.Email(required=True)
+    username = ma.Str(required=True)
+    
+    class Meta:
+        fields = ('id', 'email', 'username')
+```
+
+## Authentication and Authorization
+
+### JWT Implementation
+- Implement JWT-based authentication using Flask-JWT-Extended
+- Use decorators for protecting routes
+- Example:
+```python
+@app.route('/protected')
+@jwt_required()
+def protected_route():
+    current_user_id = get_jwt_identity()
+    return {'message': f'Hello user {current_user_id}'}
+```
+
+## Testing
+
+### Test Structure
+- Write unit tests using pytest
+- Use Flask's test client for integration testing
+- Implement test fixtures for database and application setup
+- Example:
+```python
+def test_create_user(client):
+    """Test user creation endpoint."""
+    response = client.post('/api/users', json={
+        'email': 'test@example.com',
+        'username': 'testuser'
+    })
+    assert response.status_code == 201
+    assert 'user_id' in response.json
+```
+
+## API Documentation
+
+### Swagger/OpenAPI
+- Use Flask-RESTX or Flasgger for Swagger/OpenAPI documentation
+- Ensure all endpoints are properly documented
+- Include request/response schemas
+
+## Deployment
+
+### WSGI Server
+- Use Gunicorn or uWSGI as WSGI HTTP Server
+- Implement proper logging and monitoring in production
+- Use environment variables for configuration
+
+### Docker Support
+- Reference existing Docker setup: [Dockerfile](mdc:sms-gateway-web/Dockerfile)
+- Reference docker-compose: [docker-compose.yml](mdc:sms-gateway-web/docker-compose.yml)
+
+## Key Conventions
+
+1. Use Flask's application context and request context appropriately
+2. Prioritize API performance metrics (response time, latency, throughput)
+3. Structure the application with clear separation of concerns
+4. Use environment variables for configuration management
+5. Reference existing project structure: [app.py](mdc:sms-gateway-web/app.py), [run.py](mdc:sms-gateway-web/run.py)
+
+## Project-Specific References
+- Main Flask application: [app.py](mdc:sms-gateway-web/app.py)
+- Application entry point: [run.py](mdc:sms-gateway-web/run.py)
+- Dependencies: [requirements.txt](mdc:sms-gateway-web/requirements.txt)
+- Project configuration: [pyproject.toml](mdc:pyproject.toml)
+- Testing: [tests/](mdc:tests)
+````
+
+## File: .cursor/rules/testing-and-quality.mdc
+````
+---
+description:
+globs:
+alwaysApply: false
+---
+````
+
+## File: .github/workflows/close-issues.yml
+````yaml
+name: Close inactive issues
+on:
+  schedule:
+    - cron: "30 1 * * *"
+
+jobs:
+  close-issues:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - uses: actions/stale@v5
+        with:
+          days-before-issue-stale: 7
+          days-before-issue-close: 7
+          days-before-pr-close: -1
+          days-before-pr-stale: -1
+          stale-issue-message: "This issue is stale because it has been open for 7 days with no activity."
+          close-issue-message: "This issue was closed because it has been inactive for 7 days since being marked as stale."
+          stale-issue-label: "stale"
+          exempt-all-assignees: true
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+````
+
+## File: .github/workflows/publish.yml
+````yaml
+# This workflow will upload a Python Package when a release is created
+
+name: Upload Python Package
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/android-sms-gateway
+    permissions:
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Python
+        uses: actions/setup-python@v3
+        with:
+          python-version: "3.x"
+
+      - name: Install pipenv
+        run: |
+          python -m pip install --upgrade pipenv
+
+      - name: Install dependencies
+        run: |
+          pipenv install --deploy --dev
+
+      - name: Build package
+        run: |
+          sed -i 's|VERSION = ".*"|VERSION = "'${GITHUB_REF_NAME:1}'"|g' ./android_sms_gateway/constants.py
+          pipenv run python -m build
+
+      - name: Publish package
+        uses: pypa/gh-action-pypi-publish@release/v1
+````
+
+## File: .github/workflows/testing.yml
+````yaml
+name: Python CI
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.9", "3.10", "3.11", "3.12", "3.13"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pipenv
+
+      - name: Install pipenv
+        run: |
+          python -m pip install --upgrade pipenv
+
+      - name: Install dependencies
+        run: |
+          pipenv sync --dev
+          pipenv sync --categories encryption
+
+      - name: Lint with flake8
+        run: pipenv run flake8 android_sms_gateway tests
+
+      - name: Test with pytest
+        run: pipenv run pytest tests
+````
+
+## File: android_sms_gateway/__init__.py
+````python
+from .ahttp import AsyncHttpClient
+from .client import APIClient, AsyncAPIClient
+from .constants import VERSION
+from .domain import Message, MessageState, RecipientState
+from .encryption import Encryptor
+from .http import HttpClient
+
+__all__ = (
+    "APIClient",
+    "AsyncAPIClient",
+    "AsyncHttpClient",
+    "HttpClient",
+    "Message",
+    "MessageState",
+    "RecipientState",
+    "Encryptor",
+)
+
+__version__ = VERSION
+````
+
+## File: android_sms_gateway/ahttp.py
+````python
+import abc
+import typing as t
+
+
+class AsyncHttpClient(t.Protocol):
+    @abc.abstractmethod
+    async def get(
+        self, url: str, *, headers: t.Optional[t.Dict[str, str]] = None
+    ) -> dict: ...
+
+    @abc.abstractmethod
+    async def post(
+        self, url: str, payload: dict, *, headers: t.Optional[t.Dict[str, str]] = None
+    ) -> dict: ...
+
+    @abc.abstractmethod
+    async def delete(
+        self, url: str, *, headers: t.Optional[t.Dict[str, str]] = None
+    ) -> None:
+        """
+        Sends a DELETE request to the specified URL.
+
+        Args:
+            url: The URL to send the DELETE request to.
+            headers: Optional dictionary of HTTP headers to send with the request.
+
+        Returns:
+            None
+        """
+
+    async def __aenter__(self):
+        pass
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        pass
+
+
+DEFAULT_CLIENT: t.Optional[t.Type[AsyncHttpClient]] = None
+
+
+try:
+    import aiohttp
+
+    class AiohttpAsyncHttpClient(AsyncHttpClient):
+        def __init__(self, session: t.Optional[aiohttp.ClientSession] = None) -> None:
+            self._session = session
+
+        async def __aenter__(self):
+            if self._session is not None:
+                raise ValueError("Session already initialized")
+
+            self._session = await aiohttp.ClientSession().__aenter__()
+
+            return self
+
+        async def __aexit__(self, exc_type, exc_val, exc_tb):
+            if self._session is None:
+                return
+
+            await self._session.close()
+            self._session = None
+
+        async def get(
+            self, url: str, *, headers: t.Optional[t.Dict[str, str]] = None
+        ) -> dict:
+            if self._session is None:
+                raise ValueError("Session not initialized")
+
+            async with self._session.get(url, headers=headers) as response:
+                response.raise_for_status()
+                return await response.json()
+
+        async def post(
+            self,
+            url: str,
+            payload: dict,
+            *,
+            headers: t.Optional[t.Dict[str, str]] = None,
+        ) -> dict:
+            if self._session is None:
+                raise ValueError("Session not initialized")
+
+            async with self._session.post(
+                url, headers=headers, json=payload
+            ) as response:
+                response.raise_for_status()
+                return await response.json()
+
+        async def delete(
+            self, url: str, *, headers: t.Optional[t.Dict[str, str]] = None
+        ) -> None:
+            if self._session is None:
+                raise ValueError("Session not initialized")
+
+            async with self._session.delete(url, headers=headers) as response:
+                response.raise_for_status()
+
+    DEFAULT_CLIENT = AiohttpAsyncHttpClient
+except ImportError:
+    pass
+
+try:
+    import httpx
+
+    class HttpxAsyncHttpClient(AsyncHttpClient):
+        def __init__(self, client: t.Optional[httpx.AsyncClient] = None) -> None:
+            self._client = client
+
+        async def __aenter__(self):
+            if self._client is not None:
+                raise ValueError("Client already initialized")
+
+            self._client = await httpx.AsyncClient().__aenter__()
+
+            return self
+
+        async def __aexit__(self, exc_type, exc_val, exc_tb):
+            if self._client is None:
+                return
+
+            await self._client.aclose()
+            self._client = None
+
+        async def get(
+            self, url: str, *, headers: t.Optional[t.Dict[str, str]] = None
+        ) -> dict:
+            if self._client is None:
+                raise ValueError("Client not initialized")
+
+            response = await self._client.get(url, headers=headers)
+
+            return response.raise_for_status().json()
+
+        async def post(
+            self,
+            url: str,
+            payload: dict,
+            *,
+            headers: t.Optional[t.Dict[str, str]] = None,
+        ) -> dict:
+            if self._client is None:
+                raise ValueError("Client not initialized")
+
+            response = await self._client.post(url, headers=headers, json=payload)
+
+            return response.raise_for_status().json()
+
+        async def delete(
+            self, url: str, *, headers: t.Optional[t.Dict[str, str]] = None
+        ) -> None:
+            if self._client is None:
+                raise ValueError("Client not initialized")
+
+            response = await self._client.delete(url, headers=headers)
+            response.raise_for_status()
+
+    DEFAULT_CLIENT = HttpxAsyncHttpClient
+except ImportError:
+    pass
+
+
+def get_client() -> AsyncHttpClient:
+    if DEFAULT_CLIENT is None:
+        raise ImportError("Please install aiohttp or httpx")
+
+    return DEFAULT_CLIENT()
+````
+
+## File: android_sms_gateway/client.py
+````python
+import abc
+import base64
+import dataclasses
+import logging
+import sys
+import typing as t
+
+from . import ahttp, domain, http
+from .constants import DEFAULT_URL, VERSION
+from .encryption import BaseEncryptor
+
+logger = logging.getLogger(__name__)
+
+
+class BaseClient(abc.ABC):
+    def __init__(
+        self,
+        login: str,
+        password: str,
+        *,
+        base_url: str = DEFAULT_URL,
+        encryptor: t.Optional[BaseEncryptor] = None,
+    ) -> None:
+        credentials = base64.b64encode(f"{login}:{password}".encode("utf-8")).decode(
+            "utf-8"
+        )
+        self.headers = {
+            "Authorization": f"Basic {credentials}",
+            "Content-Type": "application/json",
+            "User-Agent": f"android-sms-gateway/{VERSION} (client; python {sys.version_info.major}.{sys.version_info.minor})",
+        }
+        self.base_url = base_url.rstrip("/")
+        self.encryptor = encryptor
+
+    def _encrypt(self, message: domain.Message) -> domain.Message:
+        if self.encryptor is None:
+            return message
+
+        if message.is_encrypted:
+            raise ValueError("Message is already encrypted")
+
+        message = dataclasses.replace(
+            message,
+            is_encrypted=True,
+            message=self.encryptor.encrypt(message.message),
+            phone_numbers=[
+                self.encryptor.encrypt(phone) for phone in message.phone_numbers
+            ],
+        )
+
+        return message
+
+    def _decrypt(self, state: domain.MessageState) -> domain.MessageState:
+        if state.is_encrypted and self.encryptor is None:
+            raise ValueError("Message is encrypted but encryptor is not set")
+
+        if self.encryptor is None:
+            return state
+
+        return dataclasses.replace(
+            state,
+            recipients=[
+                dataclasses.replace(
+                    recipient,
+                    phone_number=self.encryptor.decrypt(recipient.phone_number),
+                )
+                for recipient in state.recipients
+            ],
+            is_encrypted=False,
+        )
+
+
+class APIClient(BaseClient):
+    def __init__(
+        self,
+        login: str,
+        password: str,
+        *,
+        base_url: str = DEFAULT_URL,
+        encryptor: t.Optional[BaseEncryptor] = None,
+        http: t.Optional[http.HttpClient] = None,
+    ) -> None:
+        super().__init__(login, password, base_url=base_url, encryptor=encryptor)
+        self.http = http
+        self.default_http = None
+
+    def __enter__(self):
+        if self.http is not None:
+            return self
+
+        self.http = self.default_http = http.get_client().__enter__()
+
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if self.default_http is None:
+            return
+
+        self.default_http.__exit__(exc_type, exc_val, exc_tb)
+        self.http = self.default_http = None
+
+    def send(self, message: domain.Message) -> domain.MessageState:
+        if self.http is None:
+            raise ValueError("HTTP client not initialized")
+
+        message = self._encrypt(message)
+        return self._decrypt(
+            domain.MessageState.from_dict(
+                self.http.post(
+                    f"{self.base_url}/message",
+                    payload=message.asdict(),
+                    headers=self.headers,
+                )
+            )
+        )
+
+    def get_state(self, _id: str) -> domain.MessageState:
+        if self.http is None:
+            raise ValueError("HTTP client not initialized")
+
+        return self._decrypt(
+            domain.MessageState.from_dict(
+                self.http.get(f"{self.base_url}/message/{_id}", headers=self.headers)
+            )
+        )
+
+    def get_webhooks(self) -> t.List[domain.Webhook]:
+        """
+        Retrieves a list of all webhooks registered for the account.
+
+        Returns:
+            A list of Webhook instances.
+        """
+        if self.http is None:
+            raise ValueError("HTTP client not initialized")
+
+        return [
+            domain.Webhook.from_dict(webhook)
+            for webhook in self.http.get(
+                f"{self.base_url}/webhooks", headers=self.headers
+            )
+        ]
+
+    def create_webhook(self, webhook: domain.Webhook) -> domain.Webhook:
+        """
+        Creates a new webhook.
+
+        Args:
+            webhook: The webhook to create.
+
+        Returns:
+            The created webhook.
+        """
+        if self.http is None:
+            raise ValueError("HTTP client not initialized")
+
+        return domain.Webhook.from_dict(
+            self.http.post(
+                f"{self.base_url}/webhooks",
+                payload=webhook.asdict(),
+                headers=self.headers,
+            )
+        )
+
+    def delete_webhook(self, _id: str) -> None:
+        """
+        Deletes a webhook.
+
+        Args:
+            _id: The ID of the webhook to delete.
+
+        Returns:
+            None
+        """
+        if self.http is None:
+            raise ValueError("HTTP client not initialized")
+
+        self.http.delete(f"{self.base_url}/webhooks/{_id}", headers=self.headers)
+
+
+class AsyncAPIClient(BaseClient):
+    def __init__(
+        self,
+        login: str,
+        password: str,
+        *,
+        base_url: str = DEFAULT_URL,
+        encryptor: t.Optional[BaseEncryptor] = None,
+        http_client: t.Optional[ahttp.AsyncHttpClient] = None,
+    ) -> None:
+        super().__init__(login, password, base_url=base_url, encryptor=encryptor)
+        self.http = http_client
+        self.default_http = None
+
+    async def __aenter__(self):
+        if self.http is not None:
+            return self
+
+        self.http = self.default_http = await ahttp.get_client().__aenter__()
+
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        if self.default_http is None:
+            return
+
+        await self.default_http.__aexit__(exc_type, exc_val, exc_tb)
+        self.http = self.default_http = None
+
+    async def send(self, message: domain.Message) -> domain.MessageState:
+        if self.http is None:
+            raise ValueError("HTTP client not initialized")
+
+        message = self._encrypt(message)
+        return self._decrypt(
+            domain.MessageState.from_dict(
+                await self.http.post(
+                    f"{self.base_url}/message",
+                    payload=message.asdict(),
+                    headers=self.headers,
+                )
+            )
+        )
+
+    async def get_state(self, _id: str) -> domain.MessageState:
+        if self.http is None:
+            raise ValueError("HTTP client not initialized")
+
+        return self._decrypt(
+            domain.MessageState.from_dict(
+                await self.http.get(
+                    f"{self.base_url}/message/{_id}", headers=self.headers
+                )
+            )
+        )
+
+    async def get_webhooks(self) -> t.List[domain.Webhook]:
+        """
+        Retrieves a list of all webhooks registered for the account.
+
+        Returns:
+            A list of Webhook instances.
+        """
+        if self.http is None:
+            raise ValueError("HTTP client not initialized")
+
+        return [
+            domain.Webhook.from_dict(webhook)
+            for webhook in await self.http.get(
+                f"{self.base_url}/webhooks", headers=self.headers
+            )
+        ]
+
+    async def create_webhook(self, webhook: domain.Webhook) -> domain.Webhook:
+        """
+        Creates a new webhook.
+
+        Args:
+            webhook: The webhook to create.
+
+        Returns:
+            The created webhook.
+        """
+        if self.http is None:
+            raise ValueError("HTTP client not initialized")
+
+        return domain.Webhook.from_dict(
+            await self.http.post(
+                f"{self.base_url}/webhooks",
+                payload=webhook.asdict(),
+                headers=self.headers,
+            )
+        )
+
+    async def delete_webhook(self, _id: str) -> None:
+        """
+        Deletes a webhook.
+
+        Args:
+            _id: The ID of the webhook to delete.
+
+        Returns:
+            None
+        """
+        if self.http is None:
+            raise ValueError("HTTP client not initialized")
+
+        await self.http.delete(f"{self.base_url}/webhooks/{_id}", headers=self.headers)
+````
+
+## File: android_sms_gateway/constants.py
+````python
+VERSION = "1.0.0"
+
+DEFAULT_URL = "https://api.sms-gate.app/3rdparty/v1"
+````
+
+## File: android_sms_gateway/domain.py
+````python
+import dataclasses
+import typing as t
+
+from .enums import ProcessState, WebhookEvent
+
+
+def snake_to_camel(snake_str):
+    components = snake_str.split("_")
+    return components[0] + "".join(x.title() for x in components[1:])
+
+
+@dataclasses.dataclass(frozen=True)
+class Message:
+    message: str
+    phone_numbers: t.List[str]
+    with_delivery_report: bool = True
+    is_encrypted: bool = False
+
+    id: t.Optional[str] = None
+    ttl: t.Optional[int] = None
+    sim_number: t.Optional[int] = None
+
+    def asdict(self) -> t.Dict[str, t.Any]:
+        return {
+            snake_to_camel(field.name): getattr(self, field.name)
+            for field in dataclasses.fields(self)
+            if getattr(self, field.name) is not None
+        }
+
+
+@dataclasses.dataclass(frozen=True)
+class RecipientState:
+    phone_number: str
+    state: ProcessState
+    error: t.Optional[str]
+
+    @classmethod
+    def from_dict(cls, payload: t.Dict[str, t.Any]) -> "RecipientState":
+        return cls(
+            phone_number=payload["phoneNumber"],
+            state=ProcessState(payload["state"]),
+            error=payload.get("error"),
+        )
+
+
+@dataclasses.dataclass(frozen=True)
+class MessageState:
+    id: str
+    state: ProcessState
+    recipients: t.List[RecipientState]
+    is_hashed: bool
+    is_encrypted: bool
+
+    @classmethod
+    def from_dict(cls, payload: t.Dict[str, t.Any]) -> "MessageState":
+        return cls(
+            id=payload["id"],
+            state=ProcessState(payload["state"]),
+            recipients=[
+                RecipientState.from_dict(recipient)
+                for recipient in payload["recipients"]
+            ],
+            is_hashed=payload.get("isHashed", False),
+            is_encrypted=payload.get("isEncrypted", False),
+        )
+
+
+@dataclasses.dataclass(frozen=True)
+class Webhook:
+    """A webhook configuration."""
+
+    id: t.Optional[str]
+    """The unique identifier of the webhook."""
+    url: str
+    """The URL the webhook will be sent to."""
+    event: WebhookEvent
+    """The type of event the webhook is triggered for."""
+
+    @classmethod
+    def from_dict(cls, payload: t.Dict[str, t.Any]) -> "Webhook":
+        """Creates a Webhook instance from a dictionary.
+
+        Args:
+            payload: A dictionary containing the webhook's data.
+
+        Returns:
+            A Webhook instance.
+        """
+        return cls(
+            id=payload.get("id"),
+            url=payload["url"],
+            event=WebhookEvent(payload["event"]),
+        )
+
+    def asdict(self) -> t.Dict[str, t.Any]:
+        """Returns a dictionary representation of the webhook.
+
+        Returns:
+            A dictionary containing the webhook's data.
+        """
+        return {
+            "id": self.id,
+            "url": self.url,
+            "event": self.event.value,
+        }
+````
+
+## File: android_sms_gateway/encryption.py
+````python
+import abc
+import base64
+import typing as t
+
+
+class BaseEncryptor(abc.ABC):
+    def __init__(self, passphrase: str, *, iterations: int) -> None:
+        self.passphrase = passphrase
+        self.iterations = iterations
+
+    @abc.abstractmethod
+    def encrypt(self, cleartext: str) -> str:
+        ...
+
+    @abc.abstractmethod
+    def decrypt(self, encrypted: str) -> str:
+        ...
+
+
+_Encryptor: t.Optional[t.Type[BaseEncryptor]] = None
+
+
+try:
+    from Crypto.Cipher import AES
+    from Crypto.Hash import SHA1
+    from Crypto.Protocol.KDF import PBKDF2
+    from Crypto.Random import get_random_bytes
+    from Crypto.Util.Padding import pad, unpad
+
+    class AESEncryptor(BaseEncryptor):
+        def encrypt(self, cleartext: str) -> str:
+            saltBytes = self._generate_salt()
+            key = self._generate_key(saltBytes, self.iterations)
+
+            cipher = AES.new(key, AES.MODE_CBC, iv=saltBytes)
+
+            encrypted_bytes = cipher.encrypt(pad(cleartext.encode(), AES.block_size))
+
+            salt = base64.b64encode(saltBytes).decode("utf-8")
+            encrypted = base64.b64encode(encrypted_bytes).decode("utf-8")
+
+            return f"$aes-256-cbc/pbkdf2-sha1$i={self.iterations}${salt}${encrypted}"
+
+        def decrypt(self, encrypted: str) -> str:
+            chunks = encrypted.split("$")
+
+            if len(chunks) < 5:
+                raise ValueError("Invalid encryption format")
+
+            if chunks[1] != "aes-256-cbc/pbkdf2-sha1":
+                raise ValueError("Unsupported algorithm")
+
+            params = self._parse_params(chunks[2])
+            if "i" not in params:
+                raise ValueError("Missing iteration count")
+
+            iterations = int(params["i"])
+            salt = base64.b64decode(chunks[-2])
+            encrypted_bytes = base64.b64decode(chunks[-1])
+
+            key = self._generate_key(salt, iterations)
+            cipher = AES.new(key, AES.MODE_CBC, iv=salt)
+
+            decrypted_bytes = unpad(cipher.decrypt(encrypted_bytes), AES.block_size)
+
+            return decrypted_bytes.decode("utf-8")
+
+        def _generate_salt(self) -> bytes:
+            return get_random_bytes(16)
+
+        def _generate_key(self, salt: bytes, iterations: int) -> bytes:
+            return PBKDF2(
+                self.passphrase,
+                salt,
+                count=iterations,
+                dkLen=32,
+                hmac_hash_module=SHA1,
+            )
+
+        def _parse_params(self, params: str) -> t.Dict[str, str]:
+            return {k: v for k, v in [p.split("=") for p in params.split(",")]}
+
+    _Encryptor = AESEncryptor
+except ImportError:
+    ...
+
+
+def Encryptor(passphrase: str, *, iterations: int = 75_000) -> BaseEncryptor:
+    if _Encryptor is None:
+        raise ImportError("Please install cryptodome")
+
+    return _Encryptor(passphrase, iterations=iterations)
+````
+
+## File: android_sms_gateway/enums.py
+````python
+import enum
+
+
+class ProcessState(enum.Enum):
+    Pending = "Pending"
+    Processed = "Processed"
+    Sent = "Sent"
+    Delivered = "Delivered"
+    Failed = "Failed"
+
+
+class WebhookEvent(enum.Enum):
+    """
+    Webhook events that can be sent by the server.
+    """
+
+    SMS_RECEIVED = "sms:received"
+    """Triggered when an SMS is received."""
+
+    SMS_SENT = "sms:sent"
+    """Triggered when an SMS is sent."""
+
+    SMS_DELIVERED = "sms:delivered"
+    """Triggered when an SMS is delivered."""
+
+    SMS_FAILED = "sms:failed"
+    """Triggered when an SMS processing fails."""
+
+    SYSTEM_PING = "system:ping"
+    """Triggered when the device pings the server."""
+````
+
+## File: android_sms_gateway/http.py
+````python
+import abc
+import typing as t
+
+
+class HttpClient(t.Protocol):
+    @abc.abstractmethod
+    def get(
+        self, url: str, *, headers: t.Optional[t.Dict[str, str]] = None
+    ) -> dict: ...
+
+    @abc.abstractmethod
+    def post(
+        self, url: str, payload: dict, *, headers: t.Optional[t.Dict[str, str]] = None
+    ) -> dict: ...
+
+    @abc.abstractmethod
+    def delete(self, url: str, *, headers: t.Optional[t.Dict[str, str]] = None) -> None:
+        """
+        Sends a DELETE request to the specified URL.
+
+        Args:
+            url: The URL to send the DELETE request to.
+            headers: Optional dictionary of HTTP headers to send with the request.
+
+        Returns:
+            None
+        """
+
+    def __enter__(self):
+        pass
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        pass
+
+
+DEFAULT_CLIENT: t.Optional[t.Type[HttpClient]] = None
+
+try:
+    import requests
+
+    class RequestsHttpClient(HttpClient):
+        def __init__(self, session: t.Optional[requests.Session] = None) -> None:
+            self._session = session
+
+        def __enter__(self):
+            if self._session is not None:
+                raise ValueError("Session already initialized")
+
+            self._session = requests.Session().__enter__()
+
+            return self
+
+        def __exit__(self, exc_type, exc_val, exc_tb):
+            if self._session is None:
+                return
+
+            self._session.close()
+            self._session = None
+
+        def get(
+            self, url: str, *, headers: t.Optional[t.Dict[str, str]] = None
+        ) -> dict:
+            if self._session is None:
+                raise ValueError("Session not initialized")
+
+            return self._process_response(self._session.get(url, headers=headers))
+
+        def post(
+            self,
+            url: str,
+            payload: dict,
+            *,
+            headers: t.Optional[t.Dict[str, str]] = None,
+        ) -> dict:
+            if self._session is None:
+                raise ValueError("Session not initialized")
+
+            return self._process_response(
+                self._session.post(url, headers=headers, json=payload)
+            )
+
+        def delete(
+            self, url: str, *, headers: t.Optional[t.Dict[str, str]] = None
+        ) -> None:
+            if self._session is None:
+                raise ValueError("Session not initialized")
+
+            self._session.delete(url, headers=headers).raise_for_status()
+
+        def _process_response(self, response: requests.Response) -> dict:
+            response.raise_for_status()
+            return response.json()
+
+    DEFAULT_CLIENT = RequestsHttpClient
+except ImportError:
+    pass
+
+try:
+    import httpx
+
+    class HttpxHttpClient(HttpClient):
+        def __init__(self, client: t.Optional[httpx.Client] = None) -> None:
+            self._client = client
+
+        def __enter__(self):
+            if self._client is not None:
+                raise ValueError("Client already initialized")
+
+            self._client = httpx.Client().__enter__()
+
+            return self
+
+        def __exit__(self, exc_type, exc_val, exc_tb):
+            if self._client is None:
+                return
+
+            self._client.close()
+            self._client = None
+
+        def get(
+            self, url: str, *, headers: t.Optional[t.Dict[str, str]] = None
+        ) -> dict:
+            if self._client is None:
+                raise ValueError("Client not initialized")
+
+            return self._client.get(url, headers=headers).raise_for_status().json()
+
+        def post(
+            self,
+            url: str,
+            payload: dict,
+            *,
+            headers: t.Optional[t.Dict[str, str]] = None,
+        ) -> dict:
+            if self._client is None:
+                raise ValueError("Client not initialized")
+
+            return (
+                self._client.post(url, headers=headers, json=payload)
+                .raise_for_status()
+                .json()
+            )
+
+        def delete(
+            self, url: str, *, headers: t.Optional[t.Dict[str, str]] = None
+        ) -> None:
+            if self._client is None:
+                raise ValueError("Client not initialized")
+
+            self._client.delete(url, headers=headers).raise_for_status()
+
+    DEFAULT_CLIENT = HttpxHttpClient
+except ImportError:
+    pass
+
+
+def get_client() -> HttpClient:
+    if DEFAULT_CLIENT is None:
+        raise ImportError("Please install requests or httpx")
+
+    return DEFAULT_CLIENT()
+````
 
 ## File: sms-gateway-web/templates/base.html
 ````html
@@ -3798,6 +5092,46 @@ def api_test_connection():
         return jsonify({'success': False, 'error': f'Erro inesperado: {str(e)}'})
 ````
 
+## File: sms-gateway-web/docker-compose.yml
+````yaml
+version: '3.8'
+
+services:
+  web:
+    build: .
+    image: sms-gateway-web:latest
+    container_name: sms-gateway-web
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./config:/root/.sms-gateway-web
+    environment:
+      - FLASK_ENV=production
+    restart: unless-stopped
+````
+
+## File: sms-gateway-web/Dockerfile
+````
+# Use Python as the base image
+FROM python:3.9-slim
+
+# Set working directory
+WORKDIR /app
+
+# Install dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy the application code
+COPY . .
+
+# Expose the port the app runs on
+EXPOSE 5000
+
+# Command to run the application
+CMD ["python", "run.py"]
+````
+
 ## File: sms-gateway-web/README.md
 ````markdown
 # SMS Gateway Web Client
@@ -3889,137 +5223,6 @@ if __name__ == "__main__":
     args = parser.parse_args()
     
     app.run(host=args.host, port=args.port, debug=args.debug)
-````
-
-## File: requirements.txt
-````
-sqlite3
-base64
-flask
-werkzeug
-requests
-````
-
-## File: .github/workflows/close-issues.yml
-````yaml
-name: Close inactive issues
-on:
-  schedule:
-    - cron: "30 1 * * *"
-
-jobs:
-  close-issues:
-    runs-on: ubuntu-latest
-    permissions:
-      issues: write
-    steps:
-      - uses: actions/stale@v5
-        with:
-          days-before-issue-stale: 7
-          days-before-issue-close: 7
-          days-before-pr-close: -1
-          days-before-pr-stale: -1
-          stale-issue-message: "This issue is stale because it has been open for 7 days with no activity."
-          close-issue-message: "This issue was closed because it has been inactive for 7 days since being marked as stale."
-          stale-issue-label: "stale"
-          exempt-all-assignees: true
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
-````
-
-## File: android_sms_gateway/encryption.py
-````python
-import abc
-import base64
-import typing as t
-
-
-class BaseEncryptor(abc.ABC):
-    def __init__(self, passphrase: str, *, iterations: int) -> None:
-        self.passphrase = passphrase
-        self.iterations = iterations
-
-    @abc.abstractmethod
-    def encrypt(self, cleartext: str) -> str:
-        ...
-
-    @abc.abstractmethod
-    def decrypt(self, encrypted: str) -> str:
-        ...
-
-
-_Encryptor: t.Optional[t.Type[BaseEncryptor]] = None
-
-
-try:
-    from Crypto.Cipher import AES
-    from Crypto.Hash import SHA1
-    from Crypto.Protocol.KDF import PBKDF2
-    from Crypto.Random import get_random_bytes
-    from Crypto.Util.Padding import pad, unpad
-
-    class AESEncryptor(BaseEncryptor):
-        def encrypt(self, cleartext: str) -> str:
-            saltBytes = self._generate_salt()
-            key = self._generate_key(saltBytes, self.iterations)
-
-            cipher = AES.new(key, AES.MODE_CBC, iv=saltBytes)
-
-            encrypted_bytes = cipher.encrypt(pad(cleartext.encode(), AES.block_size))
-
-            salt = base64.b64encode(saltBytes).decode("utf-8")
-            encrypted = base64.b64encode(encrypted_bytes).decode("utf-8")
-
-            return f"$aes-256-cbc/pbkdf2-sha1$i={self.iterations}${salt}${encrypted}"
-
-        def decrypt(self, encrypted: str) -> str:
-            chunks = encrypted.split("$")
-
-            if len(chunks) < 5:
-                raise ValueError("Invalid encryption format")
-
-            if chunks[1] != "aes-256-cbc/pbkdf2-sha1":
-                raise ValueError("Unsupported algorithm")
-
-            params = self._parse_params(chunks[2])
-            if "i" not in params:
-                raise ValueError("Missing iteration count")
-
-            iterations = int(params["i"])
-            salt = base64.b64decode(chunks[-2])
-            encrypted_bytes = base64.b64decode(chunks[-1])
-
-            key = self._generate_key(salt, iterations)
-            cipher = AES.new(key, AES.MODE_CBC, iv=salt)
-
-            decrypted_bytes = unpad(cipher.decrypt(encrypted_bytes), AES.block_size)
-
-            return decrypted_bytes.decode("utf-8")
-
-        def _generate_salt(self) -> bytes:
-            return get_random_bytes(16)
-
-        def _generate_key(self, salt: bytes, iterations: int) -> bytes:
-            return PBKDF2(
-                self.passphrase,
-                salt,
-                count=iterations,
-                dkLen=32,
-                hmac_hash_module=SHA1,
-            )
-
-        def _parse_params(self, params: str) -> t.Dict[str, str]:
-            return {k: v for k, v in [p.split("=") for p in params.split(",")]}
-
-    _Encryptor = AESEncryptor
-except ImportError:
-    ...
-
-
-def Encryptor(passphrase: str, *, iterations: int = 75_000) -> BaseEncryptor:
-    if _Encryptor is None:
-        raise ImportError("Please install cryptodome")
-
-    return _Encryptor(passphrase, iterations=iterations)
 ````
 
 ## File: tests/test_client.py
@@ -4142,6 +5345,147 @@ class TestAPIClient:
         webhooks = client.get_webhooks()
 
         assert not any([webhook.id == "webhook_123" for webhook in webhooks])
+````
+
+## File: tests/test_domain.py
+````python
+import pytest
+
+from android_sms_gateway.enums import WebhookEvent
+from android_sms_gateway.domain import MessageState, RecipientState, Webhook
+
+
+# Test for successful instantiation from a dictionary
+def test_message_state_from_dict():
+    payload = {
+        "id": "123",
+        "state": "Pending",
+        "recipients": [
+            {"phoneNumber": "123", "state": "Pending"},
+            {"phoneNumber": "456", "state": "Pending"},
+        ],
+        "isHashed": True,
+        "isEncrypted": False,
+    }
+
+    message_state = MessageState.from_dict(payload)
+    assert message_state.id == payload["id"]
+    assert message_state.state.name == payload["state"]
+    assert all(
+        isinstance(recipient, RecipientState) for recipient in message_state.recipients
+    )
+    assert len(message_state.recipients) == len(payload["recipients"])
+    assert message_state.is_hashed == payload["isHashed"]
+    assert message_state.is_encrypted == payload["isEncrypted"]
+
+
+# Test for backward compatibility
+def test_message_state_from_dict_backwards_compatibility():
+    payload = {
+        "id": "123",
+        "state": "Pending",
+        "recipients": [
+            {"phoneNumber": "123", "state": "Pending"},
+            {"phoneNumber": "456", "state": "Pending"},
+        ],
+    }
+
+    message_state = MessageState.from_dict(payload)
+    assert message_state.id == payload["id"]
+    assert message_state.state.name == payload["state"]
+    assert all(
+        isinstance(recipient, RecipientState) for recipient in message_state.recipients
+    )
+    assert len(message_state.recipients) == len(payload["recipients"])
+    assert message_state.is_hashed is False
+    assert message_state.is_encrypted is False
+
+
+# Test for handling missing fields
+def test_message_state_from_dict_missing_fields():
+    incomplete_payload = {
+        "id": "123",
+        # 'state' is missing
+        "recipients": [
+            {"phoneNumber": "123", "state": "Pending"}
+        ],  # Assume one recipient is enough to test
+        "isHashed": True,
+        "isEncrypted": False,
+    }
+
+    with pytest.raises(KeyError):
+        MessageState.from_dict(incomplete_payload)
+
+
+# Test for handling incorrect types
+def test_message_state_from_dict_incorrect_types():
+    incorrect_payload = {
+        "id": 123,  # Should be a string
+        "state": 42,  # Should be a string that can be converted to a ProcessState
+        "recipients": "Alice, Bob",  # Should be a list of dictionaries
+        "isHashed": "yes",  # Should be a boolean
+        "isEncrypted": "no",  # Should be a boolean
+    }
+
+    with pytest.raises(
+        Exception
+    ):  # Replace Exception with the specific exception you expect
+        MessageState.from_dict(incorrect_payload)
+
+
+def test_webhook_from_dict():
+    """
+    Tests that a Webhook instance can be successfully instantiated from a dictionary
+    representation of a webhook.
+    """
+    payload = {
+        "id": "webhook_123",
+        "url": "https://example.com/webhook",
+        "event": "sms:received",
+    }
+
+    webhook = Webhook.from_dict(payload)
+
+    assert webhook.id == payload["id"]
+    assert webhook.url == payload["url"]
+    assert webhook.event == WebhookEvent(payload["event"])
+
+
+def test_webhook_asdict():
+    """
+    Tests that a Webhook instance can be successfully converted to a dictionary
+    representation and that the fields match the expected values.
+
+    This test ensures that the asdict method of the Webhook class returns a dictionary
+    with the correct keys and values.
+    """
+    webhook = Webhook(
+        id="webhook_123",
+        url="https://example.com/webhook",
+        event=WebhookEvent.SMS_RECEIVED,
+    )
+
+    expected_dict = {
+        "id": "webhook_123",
+        "url": "https://example.com/webhook",
+        "event": "sms:received",
+    }
+
+    assert webhook.asdict() == expected_dict
+
+    webhook = Webhook(
+        id=None,
+        url="https://example.com/webhook",
+        event=WebhookEvent.SMS_RECEIVED,
+    )
+
+    expected_dict = {
+        "id": None,
+        "url": "https://example.com/webhook",
+        "event": "sms:received",
+    }
+
+    assert webhook.asdict() == expected_dict
 ````
 
 ## File: tests/test_encryption.py
@@ -4685,592 +6029,6 @@ Apache License
    limitations under the License.
 ````
 
-## File: .github/workflows/publish.yml
-````yaml
-# This workflow will upload a Python Package when a release is created
-
-name: Upload Python Package
-
-on:
-  release:
-    types: [published]
-
-permissions:
-  contents: read
-
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    environment:
-      name: pypi
-      url: https://pypi.org/p/android-sms-gateway
-    permissions:
-      id-token: write
-
-    steps:
-      - uses: actions/checkout@v3
-      - name: Set up Python
-        uses: actions/setup-python@v3
-        with:
-          python-version: "3.x"
-
-      - name: Install pipenv
-        run: |
-          python -m pip install --upgrade pipenv
-
-      - name: Install dependencies
-        run: |
-          pipenv install --deploy --dev
-
-      - name: Build package
-        run: |
-          sed -i 's|VERSION = ".*"|VERSION = "'${GITHUB_REF_NAME:1}'"|g' ./android_sms_gateway/constants.py
-          pipenv run python -m build
-
-      - name: Publish package
-        uses: pypa/gh-action-pypi-publish@release/v1
-````
-
-## File: android_sms_gateway/__init__.py
-````python
-from .ahttp import AsyncHttpClient
-from .client import APIClient, AsyncAPIClient
-from .constants import VERSION
-from .domain import Message, MessageState, RecipientState
-from .encryption import Encryptor
-from .http import HttpClient
-
-__all__ = (
-    "APIClient",
-    "AsyncAPIClient",
-    "AsyncHttpClient",
-    "HttpClient",
-    "Message",
-    "MessageState",
-    "RecipientState",
-    "Encryptor",
-)
-
-__version__ = VERSION
-````
-
-## File: android_sms_gateway/ahttp.py
-````python
-import abc
-import typing as t
-
-
-class AsyncHttpClient(t.Protocol):
-    @abc.abstractmethod
-    async def get(
-        self, url: str, *, headers: t.Optional[t.Dict[str, str]] = None
-    ) -> dict: ...
-
-    @abc.abstractmethod
-    async def post(
-        self, url: str, payload: dict, *, headers: t.Optional[t.Dict[str, str]] = None
-    ) -> dict: ...
-
-    @abc.abstractmethod
-    async def delete(
-        self, url: str, *, headers: t.Optional[t.Dict[str, str]] = None
-    ) -> None:
-        """
-        Sends a DELETE request to the specified URL.
-
-        Args:
-            url: The URL to send the DELETE request to.
-            headers: Optional dictionary of HTTP headers to send with the request.
-
-        Returns:
-            None
-        """
-
-    async def __aenter__(self):
-        pass
-
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
-        pass
-
-
-DEFAULT_CLIENT: t.Optional[t.Type[AsyncHttpClient]] = None
-
-
-try:
-    import aiohttp
-
-    class AiohttpAsyncHttpClient(AsyncHttpClient):
-        def __init__(self, session: t.Optional[aiohttp.ClientSession] = None) -> None:
-            self._session = session
-
-        async def __aenter__(self):
-            if self._session is not None:
-                raise ValueError("Session already initialized")
-
-            self._session = await aiohttp.ClientSession().__aenter__()
-
-            return self
-
-        async def __aexit__(self, exc_type, exc_val, exc_tb):
-            if self._session is None:
-                return
-
-            await self._session.close()
-            self._session = None
-
-        async def get(
-            self, url: str, *, headers: t.Optional[t.Dict[str, str]] = None
-        ) -> dict:
-            if self._session is None:
-                raise ValueError("Session not initialized")
-
-            async with self._session.get(url, headers=headers) as response:
-                response.raise_for_status()
-                return await response.json()
-
-        async def post(
-            self,
-            url: str,
-            payload: dict,
-            *,
-            headers: t.Optional[t.Dict[str, str]] = None,
-        ) -> dict:
-            if self._session is None:
-                raise ValueError("Session not initialized")
-
-            async with self._session.post(
-                url, headers=headers, json=payload
-            ) as response:
-                response.raise_for_status()
-                return await response.json()
-
-        async def delete(
-            self, url: str, *, headers: t.Optional[t.Dict[str, str]] = None
-        ) -> None:
-            if self._session is None:
-                raise ValueError("Session not initialized")
-
-            async with self._session.delete(url, headers=headers) as response:
-                response.raise_for_status()
-
-    DEFAULT_CLIENT = AiohttpAsyncHttpClient
-except ImportError:
-    pass
-
-try:
-    import httpx
-
-    class HttpxAsyncHttpClient(AsyncHttpClient):
-        def __init__(self, client: t.Optional[httpx.AsyncClient] = None) -> None:
-            self._client = client
-
-        async def __aenter__(self):
-            if self._client is not None:
-                raise ValueError("Client already initialized")
-
-            self._client = await httpx.AsyncClient().__aenter__()
-
-            return self
-
-        async def __aexit__(self, exc_type, exc_val, exc_tb):
-            if self._client is None:
-                return
-
-            await self._client.aclose()
-            self._client = None
-
-        async def get(
-            self, url: str, *, headers: t.Optional[t.Dict[str, str]] = None
-        ) -> dict:
-            if self._client is None:
-                raise ValueError("Client not initialized")
-
-            response = await self._client.get(url, headers=headers)
-
-            return response.raise_for_status().json()
-
-        async def post(
-            self,
-            url: str,
-            payload: dict,
-            *,
-            headers: t.Optional[t.Dict[str, str]] = None,
-        ) -> dict:
-            if self._client is None:
-                raise ValueError("Client not initialized")
-
-            response = await self._client.post(url, headers=headers, json=payload)
-
-            return response.raise_for_status().json()
-
-        async def delete(
-            self, url: str, *, headers: t.Optional[t.Dict[str, str]] = None
-        ) -> None:
-            if self._client is None:
-                raise ValueError("Client not initialized")
-
-            response = await self._client.delete(url, headers=headers)
-            response.raise_for_status()
-
-    DEFAULT_CLIENT = HttpxAsyncHttpClient
-except ImportError:
-    pass
-
-
-def get_client() -> AsyncHttpClient:
-    if DEFAULT_CLIENT is None:
-        raise ImportError("Please install aiohttp or httpx")
-
-    return DEFAULT_CLIENT()
-````
-
-## File: android_sms_gateway/constants.py
-````python
-VERSION = "1.0.0"
-
-DEFAULT_URL = "https://api.sms-gate.app/3rdparty/v1"
-````
-
-## File: android_sms_gateway/enums.py
-````python
-import enum
-
-
-class ProcessState(enum.Enum):
-    Pending = "Pending"
-    Processed = "Processed"
-    Sent = "Sent"
-    Delivered = "Delivered"
-    Failed = "Failed"
-
-
-class WebhookEvent(enum.Enum):
-    """
-    Webhook events that can be sent by the server.
-    """
-
-    SMS_RECEIVED = "sms:received"
-    """Triggered when an SMS is received."""
-
-    SMS_SENT = "sms:sent"
-    """Triggered when an SMS is sent."""
-
-    SMS_DELIVERED = "sms:delivered"
-    """Triggered when an SMS is delivered."""
-
-    SMS_FAILED = "sms:failed"
-    """Triggered when an SMS processing fails."""
-
-    SYSTEM_PING = "system:ping"
-    """Triggered when the device pings the server."""
-````
-
-## File: android_sms_gateway/http.py
-````python
-import abc
-import typing as t
-
-
-class HttpClient(t.Protocol):
-    @abc.abstractmethod
-    def get(
-        self, url: str, *, headers: t.Optional[t.Dict[str, str]] = None
-    ) -> dict: ...
-
-    @abc.abstractmethod
-    def post(
-        self, url: str, payload: dict, *, headers: t.Optional[t.Dict[str, str]] = None
-    ) -> dict: ...
-
-    @abc.abstractmethod
-    def delete(self, url: str, *, headers: t.Optional[t.Dict[str, str]] = None) -> None:
-        """
-        Sends a DELETE request to the specified URL.
-
-        Args:
-            url: The URL to send the DELETE request to.
-            headers: Optional dictionary of HTTP headers to send with the request.
-
-        Returns:
-            None
-        """
-
-    def __enter__(self):
-        pass
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        pass
-
-
-DEFAULT_CLIENT: t.Optional[t.Type[HttpClient]] = None
-
-try:
-    import requests
-
-    class RequestsHttpClient(HttpClient):
-        def __init__(self, session: t.Optional[requests.Session] = None) -> None:
-            self._session = session
-
-        def __enter__(self):
-            if self._session is not None:
-                raise ValueError("Session already initialized")
-
-            self._session = requests.Session().__enter__()
-
-            return self
-
-        def __exit__(self, exc_type, exc_val, exc_tb):
-            if self._session is None:
-                return
-
-            self._session.close()
-            self._session = None
-
-        def get(
-            self, url: str, *, headers: t.Optional[t.Dict[str, str]] = None
-        ) -> dict:
-            if self._session is None:
-                raise ValueError("Session not initialized")
-
-            return self._process_response(self._session.get(url, headers=headers))
-
-        def post(
-            self,
-            url: str,
-            payload: dict,
-            *,
-            headers: t.Optional[t.Dict[str, str]] = None,
-        ) -> dict:
-            if self._session is None:
-                raise ValueError("Session not initialized")
-
-            return self._process_response(
-                self._session.post(url, headers=headers, json=payload)
-            )
-
-        def delete(
-            self, url: str, *, headers: t.Optional[t.Dict[str, str]] = None
-        ) -> None:
-            if self._session is None:
-                raise ValueError("Session not initialized")
-
-            self._session.delete(url, headers=headers).raise_for_status()
-
-        def _process_response(self, response: requests.Response) -> dict:
-            response.raise_for_status()
-            return response.json()
-
-    DEFAULT_CLIENT = RequestsHttpClient
-except ImportError:
-    pass
-
-try:
-    import httpx
-
-    class HttpxHttpClient(HttpClient):
-        def __init__(self, client: t.Optional[httpx.Client] = None) -> None:
-            self._client = client
-
-        def __enter__(self):
-            if self._client is not None:
-                raise ValueError("Client already initialized")
-
-            self._client = httpx.Client().__enter__()
-
-            return self
-
-        def __exit__(self, exc_type, exc_val, exc_tb):
-            if self._client is None:
-                return
-
-            self._client.close()
-            self._client = None
-
-        def get(
-            self, url: str, *, headers: t.Optional[t.Dict[str, str]] = None
-        ) -> dict:
-            if self._client is None:
-                raise ValueError("Client not initialized")
-
-            return self._client.get(url, headers=headers).raise_for_status().json()
-
-        def post(
-            self,
-            url: str,
-            payload: dict,
-            *,
-            headers: t.Optional[t.Dict[str, str]] = None,
-        ) -> dict:
-            if self._client is None:
-                raise ValueError("Client not initialized")
-
-            return (
-                self._client.post(url, headers=headers, json=payload)
-                .raise_for_status()
-                .json()
-            )
-
-        def delete(
-            self, url: str, *, headers: t.Optional[t.Dict[str, str]] = None
-        ) -> None:
-            if self._client is None:
-                raise ValueError("Client not initialized")
-
-            self._client.delete(url, headers=headers).raise_for_status()
-
-    DEFAULT_CLIENT = HttpxHttpClient
-except ImportError:
-    pass
-
-
-def get_client() -> HttpClient:
-    if DEFAULT_CLIENT is None:
-        raise ImportError("Please install requests or httpx")
-
-    return DEFAULT_CLIENT()
-````
-
-## File: tests/test_domain.py
-````python
-import pytest
-
-from android_sms_gateway.enums import WebhookEvent
-from android_sms_gateway.domain import MessageState, RecipientState, Webhook
-
-
-# Test for successful instantiation from a dictionary
-def test_message_state_from_dict():
-    payload = {
-        "id": "123",
-        "state": "Pending",
-        "recipients": [
-            {"phoneNumber": "123", "state": "Pending"},
-            {"phoneNumber": "456", "state": "Pending"},
-        ],
-        "isHashed": True,
-        "isEncrypted": False,
-    }
-
-    message_state = MessageState.from_dict(payload)
-    assert message_state.id == payload["id"]
-    assert message_state.state.name == payload["state"]
-    assert all(
-        isinstance(recipient, RecipientState) for recipient in message_state.recipients
-    )
-    assert len(message_state.recipients) == len(payload["recipients"])
-    assert message_state.is_hashed == payload["isHashed"]
-    assert message_state.is_encrypted == payload["isEncrypted"]
-
-
-# Test for backward compatibility
-def test_message_state_from_dict_backwards_compatibility():
-    payload = {
-        "id": "123",
-        "state": "Pending",
-        "recipients": [
-            {"phoneNumber": "123", "state": "Pending"},
-            {"phoneNumber": "456", "state": "Pending"},
-        ],
-    }
-
-    message_state = MessageState.from_dict(payload)
-    assert message_state.id == payload["id"]
-    assert message_state.state.name == payload["state"]
-    assert all(
-        isinstance(recipient, RecipientState) for recipient in message_state.recipients
-    )
-    assert len(message_state.recipients) == len(payload["recipients"])
-    assert message_state.is_hashed is False
-    assert message_state.is_encrypted is False
-
-
-# Test for handling missing fields
-def test_message_state_from_dict_missing_fields():
-    incomplete_payload = {
-        "id": "123",
-        # 'state' is missing
-        "recipients": [
-            {"phoneNumber": "123", "state": "Pending"}
-        ],  # Assume one recipient is enough to test
-        "isHashed": True,
-        "isEncrypted": False,
-    }
-
-    with pytest.raises(KeyError):
-        MessageState.from_dict(incomplete_payload)
-
-
-# Test for handling incorrect types
-def test_message_state_from_dict_incorrect_types():
-    incorrect_payload = {
-        "id": 123,  # Should be a string
-        "state": 42,  # Should be a string that can be converted to a ProcessState
-        "recipients": "Alice, Bob",  # Should be a list of dictionaries
-        "isHashed": "yes",  # Should be a boolean
-        "isEncrypted": "no",  # Should be a boolean
-    }
-
-    with pytest.raises(
-        Exception
-    ):  # Replace Exception with the specific exception you expect
-        MessageState.from_dict(incorrect_payload)
-
-
-def test_webhook_from_dict():
-    """
-    Tests that a Webhook instance can be successfully instantiated from a dictionary
-    representation of a webhook.
-    """
-    payload = {
-        "id": "webhook_123",
-        "url": "https://example.com/webhook",
-        "event": "sms:received",
-    }
-
-    webhook = Webhook.from_dict(payload)
-
-    assert webhook.id == payload["id"]
-    assert webhook.url == payload["url"]
-    assert webhook.event == WebhookEvent(payload["event"])
-
-
-def test_webhook_asdict():
-    """
-    Tests that a Webhook instance can be successfully converted to a dictionary
-    representation and that the fields match the expected values.
-
-    This test ensures that the asdict method of the Webhook class returns a dictionary
-    with the correct keys and values.
-    """
-    webhook = Webhook(
-        id="webhook_123",
-        url="https://example.com/webhook",
-        event=WebhookEvent.SMS_RECEIVED,
-    )
-
-    expected_dict = {
-        "id": "webhook_123",
-        "url": "https://example.com/webhook",
-        "event": "sms:received",
-    }
-
-    assert webhook.asdict() == expected_dict
-
-    webhook = Webhook(
-        id=None,
-        url="https://example.com/webhook",
-        event=WebhookEvent.SMS_RECEIVED,
-    )
-
-    expected_dict = {
-        "id": None,
-        "url": "https://example.com/webhook",
-        "event": "sms:received",
-    }
-
-    assert webhook.asdict() == expected_dict
-````
-
 ## File: Makefile
 ````
 .PHONY: install test lint build publish clean
@@ -5342,449 +6100,6 @@ aiohttp = "~=3.9"
 pycryptodome = "~=3.20"
 ````
 
-## File: android_sms_gateway/client.py
-````python
-import abc
-import base64
-import dataclasses
-import logging
-import sys
-import typing as t
-
-from . import ahttp, domain, http
-from .constants import DEFAULT_URL, VERSION
-from .encryption import BaseEncryptor
-
-logger = logging.getLogger(__name__)
-
-
-class BaseClient(abc.ABC):
-    def __init__(
-        self,
-        login: str,
-        password: str,
-        *,
-        base_url: str = DEFAULT_URL,
-        encryptor: t.Optional[BaseEncryptor] = None,
-    ) -> None:
-        credentials = base64.b64encode(f"{login}:{password}".encode("utf-8")).decode(
-            "utf-8"
-        )
-        self.headers = {
-            "Authorization": f"Basic {credentials}",
-            "Content-Type": "application/json",
-            "User-Agent": f"android-sms-gateway/{VERSION} (client; python {sys.version_info.major}.{sys.version_info.minor})",
-        }
-        self.base_url = base_url.rstrip("/")
-        self.encryptor = encryptor
-
-    def _encrypt(self, message: domain.Message) -> domain.Message:
-        if self.encryptor is None:
-            return message
-
-        if message.is_encrypted:
-            raise ValueError("Message is already encrypted")
-
-        message = dataclasses.replace(
-            message,
-            is_encrypted=True,
-            message=self.encryptor.encrypt(message.message),
-            phone_numbers=[
-                self.encryptor.encrypt(phone) for phone in message.phone_numbers
-            ],
-        )
-
-        return message
-
-    def _decrypt(self, state: domain.MessageState) -> domain.MessageState:
-        if state.is_encrypted and self.encryptor is None:
-            raise ValueError("Message is encrypted but encryptor is not set")
-
-        if self.encryptor is None:
-            return state
-
-        return dataclasses.replace(
-            state,
-            recipients=[
-                dataclasses.replace(
-                    recipient,
-                    phone_number=self.encryptor.decrypt(recipient.phone_number),
-                )
-                for recipient in state.recipients
-            ],
-            is_encrypted=False,
-        )
-
-
-class APIClient(BaseClient):
-    def __init__(
-        self,
-        login: str,
-        password: str,
-        *,
-        base_url: str = DEFAULT_URL,
-        encryptor: t.Optional[BaseEncryptor] = None,
-        http: t.Optional[http.HttpClient] = None,
-    ) -> None:
-        super().__init__(login, password, base_url=base_url, encryptor=encryptor)
-        self.http = http
-        self.default_http = None
-
-    def __enter__(self):
-        if self.http is not None:
-            return self
-
-        self.http = self.default_http = http.get_client().__enter__()
-
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        if self.default_http is None:
-            return
-
-        self.default_http.__exit__(exc_type, exc_val, exc_tb)
-        self.http = self.default_http = None
-
-    def send(self, message: domain.Message) -> domain.MessageState:
-        if self.http is None:
-            raise ValueError("HTTP client not initialized")
-
-        message = self._encrypt(message)
-        return self._decrypt(
-            domain.MessageState.from_dict(
-                self.http.post(
-                    f"{self.base_url}/message",
-                    payload=message.asdict(),
-                    headers=self.headers,
-                )
-            )
-        )
-
-    def get_state(self, _id: str) -> domain.MessageState:
-        if self.http is None:
-            raise ValueError("HTTP client not initialized")
-
-        return self._decrypt(
-            domain.MessageState.from_dict(
-                self.http.get(f"{self.base_url}/message/{_id}", headers=self.headers)
-            )
-        )
-
-    def get_webhooks(self) -> t.List[domain.Webhook]:
-        """
-        Retrieves a list of all webhooks registered for the account.
-
-        Returns:
-            A list of Webhook instances.
-        """
-        if self.http is None:
-            raise ValueError("HTTP client not initialized")
-
-        return [
-            domain.Webhook.from_dict(webhook)
-            for webhook in self.http.get(
-                f"{self.base_url}/webhooks", headers=self.headers
-            )
-        ]
-
-    def create_webhook(self, webhook: domain.Webhook) -> domain.Webhook:
-        """
-        Creates a new webhook.
-
-        Args:
-            webhook: The webhook to create.
-
-        Returns:
-            The created webhook.
-        """
-        if self.http is None:
-            raise ValueError("HTTP client not initialized")
-
-        return domain.Webhook.from_dict(
-            self.http.post(
-                f"{self.base_url}/webhooks",
-                payload=webhook.asdict(),
-                headers=self.headers,
-            )
-        )
-
-    def delete_webhook(self, _id: str) -> None:
-        """
-        Deletes a webhook.
-
-        Args:
-            _id: The ID of the webhook to delete.
-
-        Returns:
-            None
-        """
-        if self.http is None:
-            raise ValueError("HTTP client not initialized")
-
-        self.http.delete(f"{self.base_url}/webhooks/{_id}", headers=self.headers)
-
-
-class AsyncAPIClient(BaseClient):
-    def __init__(
-        self,
-        login: str,
-        password: str,
-        *,
-        base_url: str = DEFAULT_URL,
-        encryptor: t.Optional[BaseEncryptor] = None,
-        http_client: t.Optional[ahttp.AsyncHttpClient] = None,
-    ) -> None:
-        super().__init__(login, password, base_url=base_url, encryptor=encryptor)
-        self.http = http_client
-        self.default_http = None
-
-    async def __aenter__(self):
-        if self.http is not None:
-            return self
-
-        self.http = self.default_http = await ahttp.get_client().__aenter__()
-
-        return self
-
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
-        if self.default_http is None:
-            return
-
-        await self.default_http.__aexit__(exc_type, exc_val, exc_tb)
-        self.http = self.default_http = None
-
-    async def send(self, message: domain.Message) -> domain.MessageState:
-        if self.http is None:
-            raise ValueError("HTTP client not initialized")
-
-        message = self._encrypt(message)
-        return self._decrypt(
-            domain.MessageState.from_dict(
-                await self.http.post(
-                    f"{self.base_url}/message",
-                    payload=message.asdict(),
-                    headers=self.headers,
-                )
-            )
-        )
-
-    async def get_state(self, _id: str) -> domain.MessageState:
-        if self.http is None:
-            raise ValueError("HTTP client not initialized")
-
-        return self._decrypt(
-            domain.MessageState.from_dict(
-                await self.http.get(
-                    f"{self.base_url}/message/{_id}", headers=self.headers
-                )
-            )
-        )
-
-    async def get_webhooks(self) -> t.List[domain.Webhook]:
-        """
-        Retrieves a list of all webhooks registered for the account.
-
-        Returns:
-            A list of Webhook instances.
-        """
-        if self.http is None:
-            raise ValueError("HTTP client not initialized")
-
-        return [
-            domain.Webhook.from_dict(webhook)
-            for webhook in await self.http.get(
-                f"{self.base_url}/webhooks", headers=self.headers
-            )
-        ]
-
-    async def create_webhook(self, webhook: domain.Webhook) -> domain.Webhook:
-        """
-        Creates a new webhook.
-
-        Args:
-            webhook: The webhook to create.
-
-        Returns:
-            The created webhook.
-        """
-        if self.http is None:
-            raise ValueError("HTTP client not initialized")
-
-        return domain.Webhook.from_dict(
-            await self.http.post(
-                f"{self.base_url}/webhooks",
-                payload=webhook.asdict(),
-                headers=self.headers,
-            )
-        )
-
-    async def delete_webhook(self, _id: str) -> None:
-        """
-        Deletes a webhook.
-
-        Args:
-            _id: The ID of the webhook to delete.
-
-        Returns:
-            None
-        """
-        if self.http is None:
-            raise ValueError("HTTP client not initialized")
-
-        await self.http.delete(f"{self.base_url}/webhooks/{_id}", headers=self.headers)
-````
-
-## File: android_sms_gateway/domain.py
-````python
-import dataclasses
-import typing as t
-
-from .enums import ProcessState, WebhookEvent
-
-
-def snake_to_camel(snake_str):
-    components = snake_str.split("_")
-    return components[0] + "".join(x.title() for x in components[1:])
-
-
-@dataclasses.dataclass(frozen=True)
-class Message:
-    message: str
-    phone_numbers: t.List[str]
-    with_delivery_report: bool = True
-    is_encrypted: bool = False
-
-    id: t.Optional[str] = None
-    ttl: t.Optional[int] = None
-    sim_number: t.Optional[int] = None
-
-    def asdict(self) -> t.Dict[str, t.Any]:
-        return {
-            snake_to_camel(field.name): getattr(self, field.name)
-            for field in dataclasses.fields(self)
-            if getattr(self, field.name) is not None
-        }
-
-
-@dataclasses.dataclass(frozen=True)
-class RecipientState:
-    phone_number: str
-    state: ProcessState
-    error: t.Optional[str]
-
-    @classmethod
-    def from_dict(cls, payload: t.Dict[str, t.Any]) -> "RecipientState":
-        return cls(
-            phone_number=payload["phoneNumber"],
-            state=ProcessState(payload["state"]),
-            error=payload.get("error"),
-        )
-
-
-@dataclasses.dataclass(frozen=True)
-class MessageState:
-    id: str
-    state: ProcessState
-    recipients: t.List[RecipientState]
-    is_hashed: bool
-    is_encrypted: bool
-
-    @classmethod
-    def from_dict(cls, payload: t.Dict[str, t.Any]) -> "MessageState":
-        return cls(
-            id=payload["id"],
-            state=ProcessState(payload["state"]),
-            recipients=[
-                RecipientState.from_dict(recipient)
-                for recipient in payload["recipients"]
-            ],
-            is_hashed=payload.get("isHashed", False),
-            is_encrypted=payload.get("isEncrypted", False),
-        )
-
-
-@dataclasses.dataclass(frozen=True)
-class Webhook:
-    """A webhook configuration."""
-
-    id: t.Optional[str]
-    """The unique identifier of the webhook."""
-    url: str
-    """The URL the webhook will be sent to."""
-    event: WebhookEvent
-    """The type of event the webhook is triggered for."""
-
-    @classmethod
-    def from_dict(cls, payload: t.Dict[str, t.Any]) -> "Webhook":
-        """Creates a Webhook instance from a dictionary.
-
-        Args:
-            payload: A dictionary containing the webhook's data.
-
-        Returns:
-            A Webhook instance.
-        """
-        return cls(
-            id=payload.get("id"),
-            url=payload["url"],
-            event=WebhookEvent(payload["event"]),
-        )
-
-    def asdict(self) -> t.Dict[str, t.Any]:
-        """Returns a dictionary representation of the webhook.
-
-        Returns:
-            A dictionary containing the webhook's data.
-        """
-        return {
-            "id": self.id,
-            "url": self.url,
-            "event": self.event.value,
-        }
-````
-
-## File: .github/workflows/testing.yml
-````yaml
-name: Python CI
-
-on:
-  pull_request:
-
-permissions:
-  contents: read
-
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: ["3.9", "3.10", "3.11", "3.12", "3.13"]
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python-version }}
-          cache: pipenv
-
-      - name: Install pipenv
-        run: |
-          python -m pip install --upgrade pipenv
-
-      - name: Install dependencies
-        run: |
-          pipenv sync --dev
-          pipenv sync --categories encryption
-
-      - name: Lint with flake8
-        run: pipenv run flake8 android_sms_gateway tests
-
-      - name: Test with pytest
-        run: pipenv run pytest tests
-````
-
 ## File: pyproject.toml
 ````toml
 [build-system]
@@ -5832,240 +6147,407 @@ aiohttp = ["aiohttp"]
 encryption = ["pycryptodome"]
 ````
 
+## File: requirements.txt
+````
+sqlite3
+base64
+flask
+werkzeug
+requests
+````
+
 ## File: README.md
 ````markdown
-Segue a tradução para o português brasileiro do conteúdo do README do projeto "SMS Gateway for Android™ Python API Client"[1]:
-
 # 📱 Cliente Python para SMS Gateway for Android™
 
-Um cliente Python moderno para integração transparente com a API do [SMS Gateway for Android](https://sms-gate.app). Envie mensagens SMS programaticamente por meio de seus dispositivos Android com esta biblioteca poderosa e fácil de usar.
+[![PyPI version](https://badge.fury.io/py/android-sms-gateway.svg)](https://badge.fury.io/py/android-sms-gateway)
+[![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+[![Imports: isort](https://img.shields.io/badge/%20imports-isort-%231674b1?style=flat&labelColor=ef8336)](https://pycqa.github.io/isort/)
 
-## 📖 Índice
+Um cliente Python moderno e robusto para integração transparente com a API do [SMS Gateway for Android](https://sms-gate.app). Envie mensagens SMS programaticamente por meio de seus dispositivos Android com esta biblioteca poderosa, tipada e fácil de usar.
+
+## ✨ Funcionalidades
+
+- 🚀 **Cliente Duplo**: Suporte a interfaces síncronas (`APIClient`) e assíncronas (`AsyncAPIClient`)
+- 🔒 **Criptografia de Ponta a Ponta**: Criptografia opcional de mensagens usando AES-CBC-256
+- 🌐 **Múltiplos Backends HTTP**: Suporte nativo a `requests`, `aiohttp` e `httpx`
+- 🔗 **Gestão de Webhooks**: Crie, consulte e exclua webhooks programaticamente
+- ⚙️ **URL Base Personalizável**: Aponte para diferentes endpoints da API
+- 📝 **Type Hinting Completo**: Totalmente tipado para melhor experiência de desenvolvimento
+- 🛡️ **Tratamento de Erros Robusto**: Exceções específicas e mensagens de erro claras
+- 📊 **Relatórios de Entrega**: Acompanhe o status de entrega das suas mensagens
+
+## 📋 Índice
+
 - [📱 Cliente Python para SMS Gateway for Android™](#-cliente-python-para-sms-gateway-for-android)
-  - [📖 Índice](#-índice)
   - [✨ Funcionalidades](#-funcionalidades)
+  - [📋 Índice](#-índice)
   - [⚙️ Requisitos](#️-requisitos)
   - [📦 Instalação](#-instalação)
   - [🚀 Primeiros Passos](#-primeiros-passos)
-    - [Uso Básico](#uso-básico)
   - [🤖 Guia do Cliente](#-guia-do-cliente)
-    - [Configuração do Cliente](#configuração-do-cliente)
-    - [Métodos Principais](#métodos-principais)
-    - [Definições de Tipos](#definições-de-tipos)
-    - [Configuração de Criptografia](#configuração-de-criptografia)
   - [🌐 Clientes HTTP](#-clientes-http)
-  - [🔒 Notas de Segurança](#-notas-de-segurança)
-  - [📚 Referência da API](#-referência-da-api)
+  - [🔒 Segurança](#-segurança)
+  - [📚 Documentação](#-documentação)
+  - [🧪 Testes](#-testes)
   - [👥 Contribuindo](#-contribuindo)
-    - [Ambiente de Desenvolvimento](#ambiente-de-desenvolvimento)
   - [📄 Licença](#-licença)
 
-## ✨ Funcionalidades
-- **Suporte a Cliente Duplo**: Escolha entre interfaces síncronas (`APIClient`) e assíncronas (`AsyncAPIClient`)
-- **Criptografia de Ponta a Ponta**: Criptografia opcional de mensagens usando AES-CBC-256
-- **Múltiplos Backends HTTP**: Suporte a `requests`, `aiohttp` e `httpx`
-- **Gestão de Webhooks**: Crie, consulte e exclua webhooks
-- **URL Base Personalizável**: Aponte para diferentes endpoints da API
-- **Type Hinting**: Totalmente tipado para melhor experiência de desenvolvimento
-
 ## ⚙️ Requisitos
-- Python 3.9+
-- Escolha um cliente HTTP:
+
+- **Python**: 3.9 ou superior
+- **Cliente HTTP** (escolha um):
   - 🚀 [requests](https://pypi.org/project/requests/) (síncrono)
   - ⚡ [aiohttp](https://pypi.org/project/aiohttp/) (assíncrono)
   - 🌈 [httpx](https://pypi.org/project/httpx/) (síncrono + assíncrono)
 
-**Opcional**:
+**Dependências Opcionais**:
 - 🔒 [pycryptodome](https://pypi.org/project/pycryptodome/) - Para suporte à criptografia ponta a ponta
 
 ## 📦 Instalação
 
-Instale o pacote base:
+### Instalação Básica
+
 ```bash
-pip install android_sms_gateway
+pip install android-sms-gateway
 ```
 
-Instale com seu cliente HTTP preferido:
+### Instalação com Cliente HTTP Específico
+
 ```bash
-# Escolha um:
-pip install android_sms_gateway[requests]
-pip install android_sms_gateway[aiohttp]
-pip install android_sms_gateway[httpx]
+# Escolha um cliente HTTP:
+pip install android-sms-gateway[requests]    # Para uso síncrono
+pip install android-sms-gateway[aiohttp]     # Para uso assíncrono
+pip install android-sms-gateway[httpx]       # Para uso síncrono e assíncrono
 ```
 
-Para mensagens criptografadas:
+### Instalação com Criptografia
+
 ```bash
-pip install android_sms_gateway[encryption]
+# Para mensagens criptografadas:
+pip install android-sms-gateway[encryption]
+
+# Ou instale tudo:
+pip install android-sms-gateway[requests,encryption]
+```
+
+### Instalação para Desenvolvimento
+
+```bash
+git clone https://github.com/android-sms-gateway/client-py.git
+cd client-py
+pip install -e ".[dev,requests,encryption]"
 ```
 
 ## 🚀 Primeiros Passos
 
-### Uso Básico
+### Configuração Inicial
+
+1. **Configure suas credenciais**:
+   ```bash
+   export ANDROID_SMS_GATEWAY_LOGIN="seu_usuario"
+   export ANDROID_SMS_GATEWAY_PASSWORD="sua_senha"
+   ```
+
+2. **Exemplo básico de uso**:
+
 ```python
 import asyncio
 import os
+from android_sms_gateway import client, domain
 
-from android_sms_gateway import client, domain, Encryptor
-
+# Configuração
 login = os.getenv("ANDROID_SMS_GATEWAY_LOGIN")
 password = os.getenv("ANDROID_SMS_GATEWAY_PASSWORD")
-# para criptografia ponta a ponta, veja https://docs.sms-gate.app/privacy/encryption/
-# encryptor = Encryptor('frase-secreta')
 
+# Criação da mensagem
 message = domain.Message(
-    "Seu texto de mensagem aqui.",
+    "Olá! Esta é uma mensagem de teste.",
     ["+5511999999999"],
+    with_delivery_report=True
 )
 
-def sync_client():
-    with client.APIClient(
-        login, 
-        password,
-        # encryptor=encryptor,
-    ) as c:
+# Cliente Síncrono
+def exemplo_sincrono():
+    with client.APIClient(login, password) as c:
+        # Envia a mensagem
         state = c.send(message)
-        print(state)
+        print(f"Mensagem enviada com ID: {state.id}")
+        
+        # Consulta o status
+        status = c.get_state(state.id)
+        print(f"Status: {status.state}")
 
-        state = c.get_state(state.id)
-        print(state)
-
-
-async def async_client():
-    async with client.AsyncAPIClient(
-        login, 
-        password,
-        # encryptor=encryptor,
-    ) as c:
+# Cliente Assíncrono
+async def exemplo_assincrono():
+    async with client.AsyncAPIClient(login, password) as c:
+        # Envia a mensagem
         state = await c.send(message)
-        print(state)
+        print(f"Mensagem enviada com ID: {state.id}")
+        
+        # Consulta o status
+        status = await c.get_state(state.id)
+        print(f"Status: {status.state}")
 
-        state = await c.get_state(state.id)
-        print(state)
+if __name__ == "__main__":
+    print("=== Exemplo Síncrono ===")
+    exemplo_sincrono()
+    
+    print("\n=== Exemplo Assíncrono ===")
+    asyncio.run(exemplo_assincrono())
+```
 
-print("Cliente síncrono")
-sync_client()
+### Exemplo com Criptografia
 
-print("\nCliente assíncrono")
-asyncio.run(async_client())
+```python
+from android_sms_gateway import client, domain, Encryptor
+
+# Configuração de criptografia
+encryptor = Encryptor("minha-frase-secreta-super-segura")
+
+# Mensagem criptografada
+message = domain.Message(
+    "Esta mensagem será criptografada!",
+    ["+5511999999999"],
+    is_encrypted=True
+)
+
+# Cliente com criptografia
+with client.APIClient(login, password, encryptor=encryptor) as c:
+    state = c.send(message)
+    print(f"Mensagem criptografada enviada: {state.id}")
 ```
 
 ## 🤖 Guia do Cliente
 
-Existem duas classes de cliente: `APIClient` e `AsyncAPIClient`.  
-A `APIClient` é síncrona e a `AsyncAPIClient` é assíncrona. Ambas implementam a mesma interface e podem ser usadas como context managers.
-
 ### Configuração do Cliente
 
-Ambos os clientes suportam os seguintes parâmetros de inicialização:
+Ambos os clientes (`APIClient` e `AsyncAPIClient`) suportam os seguintes parâmetros:
 
-| Argumento    | Descrição                | Padrão                                    |
-| ------------ | ----------------------- | ----------------------------------------- |
-| `login`      | Usuário                 | **Obrigatório**                           |
-| `password`   | Senha                   | **Obrigatório**                           |
-| `base_url`   | URL base da API         | `"https://api.sms-gate.app/3rdparty/v1"`  |
-| `encryptor`  | Instância de Encryptor  | `None`                                    |
-| `http`       | Cliente HTTP customizado | Detectado automaticamente                 |
+| Parâmetro   | Tipo                | Descrição                           | Padrão                                    |
+|-------------|---------------------|-------------------------------------|-------------------------------------------|
+| `login`     | `str`               | Usuário da API                      | **Obrigatório**                           |
+| `password`  | `str`               | Senha da API                        | **Obrigatório**                           |
+| `base_url`  | `str`               | URL base da API                     | `"https://api.sms-gate.app/3rdparty/v1"`  |
+| `encryptor` | `Encryptor`         | Instância para criptografia         | `None`                                    |
+| `http`      | `HttpClient`        | Cliente HTTP customizado            | Detectado automaticamente                 |
 
-### Métodos Principais
+### Métodos Disponíveis
 
-| Método                                           | Descrição                | Retorno                   |
-| ------------------------------------------------ | ------------------------ | ------------------------- |
-| `send(self, message: domain.Message)`            | Envia uma mensagem       | `domain.MessageState`     |
-| `get_state(self, _id: str)`                      | Consulta o estado        | `domain.MessageState`     |
-| `create_webhook(self, webhook: domain.Webhook)`  | Cria um novo webhook     | `domain.Webhook`          |
-| `get_webhooks(self)`                             | Lista todos os webhooks  | `List[domain.Webhook]`    |
-| `delete_webhook(self, _id: str)`                 | Exclui um webhook        | `None`                    |
+| Método                                           | Descrição                    | Retorno                   |
+|--------------------------------------------------|------------------------------|---------------------------|
+| `send(message: domain.Message)`                  | Envia uma mensagem SMS       | `domain.MessageState`     |
+| `get_state(id: str)`                             | Consulta o estado da mensagem| `domain.MessageState`     |
+| `create_webhook(webhook: domain.Webhook)`        | Cria um novo webhook         | `domain.Webhook`          |
+| `get_webhooks()`                                 | Lista todos os webhooks      | `List[domain.Webhook]`    |
+| `delete_webhook(id: str)`                        | Exclui um webhook            | `None`                    |
 
-### Definições de Tipos
+### Estruturas de Dados
 
+#### Message
 ```python
 class Message:
-    message: str
-    phone_numbers: t.List[str]
-    with_delivery_report: bool = True
-    is_encrypted: bool = False
-
-    id: t.Optional[str] = None
-    ttl: t.Optional[int] = None
-    sim_number: t.Optional[int] = None
-
-
-class MessageState:
-    id: str
-    state: ProcessState
-    recipients: t.List[RecipientState]
-    is_hashed: bool
-    is_encrypted: bool
-
-class Webhook:
-    id: t.Optional[str]
-    url: str
-    event: WebhookEvent
+    message: str                    # Texto da mensagem
+    phone_numbers: List[str]        # Lista de números de telefone
+    with_delivery_report: bool = True  # Relatório de entrega
+    is_encrypted: bool = False      # Se a mensagem é criptografada
+    
+    # Campos opcionais
+    id: Optional[str] = None        # ID da mensagem
+    ttl: Optional[int] = None       # Time-to-live em segundos
+    sim_number: Optional[int] = None # Número do SIM
 ```
 
-Para mais detalhes, veja [`domain.py`](./android_sms_gateway/domain.py).
-
-### Configuração de Criptografia
+#### MessageState
 ```python
-from android_sms_gateway import client, Encryptor
-
-# Inicialize com sua frase secreta
-encryptor = Encryptor("minha-frase-secreta")
-
-# Use na inicialização do cliente
-client.APIClient(login, password, encryptor=encryptor)
+class MessageState:
+    id: str                         # ID único da mensagem
+    state: ProcessState             # Estado atual (SENT, DELIVERED, etc.)
+    recipients: List[RecipientState] # Status por destinatário
+    is_hashed: bool                 # Se a mensagem foi hasheada
+    is_encrypted: bool              # Se a mensagem foi criptografada
 ```
+
+#### Webhook
+```python
+class Webhook:
+    id: Optional[str]               # ID do webhook
+    url: str                        # URL de callback
+    event: WebhookEvent             # Tipo de evento
+```
+
+Para mais detalhes, consulte [`domain.py`](./android_sms_gateway/domain.py).
 
 ## 🌐 Clientes HTTP
-A biblioteca detecta automaticamente os clientes HTTP instalados. Prioridade:
 
-| Cliente   | Síncrono | Assíncrono |
-| --------- | -------- | ---------- |
-| aiohttp   | ❌       | 1️⃣         |
-| requests  | 1️⃣       | ❌         |
-| httpx     | 2️⃣       | 2️⃣         |
+A biblioteca detecta automaticamente os clientes HTTP instalados com a seguinte prioridade:
 
-Para usar um cliente específico:
+| Cliente   | Síncrono | Assíncrono | Prioridade |
+|-----------|----------|------------|------------|
+| aiohttp   | ❌       | 1️⃣         | Assíncrono |
+| requests  | 1️⃣       | ❌         | Síncrono   |
+| httpx     | 2️⃣       | 2️⃣         | Universal  |
+
+### Uso de Cliente Específico
+
 ```python
-# Forçar uso do cliente síncrono httpx
+from android_sms_gateway import http
+
+# Forçar uso do httpx
 client.APIClient(..., http=http.HttpxHttpClient())
+
+# Forçar uso do requests
+client.APIClient(..., http=http.RequestsHttpClient())
+
+# Forçar uso do aiohttp (apenas assíncrono)
+async with client.AsyncAPIClient(..., http=http.AiohttpHttpClient()) as c:
+    # ...
 ```
 
-Você também pode implementar seu próprio cliente HTTP que siga o protocolo `http.HttpClient` ou `ahttp.HttpClient`.
+### Cliente HTTP Customizado
 
-## 🔒 Notas de Segurança
+Você pode implementar seu próprio cliente HTTP seguindo os protocolos `http.HttpClient` ou `ahttp.HttpClient`.
 
-⚠️ **Práticas Importantes de Segurança**
-- Sempre armazene credenciais em variáveis de ambiente
-- Nunca exponha credenciais em código do lado do cliente
-- Use HTTPS para todas as comunicações em produção
+## 🔒 Segurança
 
-## 📚 Referência da API
-Para documentação completa da API, incluindo todos os métodos disponíveis, esquemas de requisição/resposta e códigos de erro, acesse:  
-[📘 Documentação Oficial da API](https://docs.sms-gate.app/integration/api/)
+### Boas Práticas
+
+⚠️ **IMPORTANTE**: Sempre siga estas práticas de segurança:
+
+- 🔐 **Credenciais**: Armazene credenciais em variáveis de ambiente
+- 🚫 **Código**: Nunca exponha credenciais em código do lado do cliente
+- 🔒 **HTTPS**: Use HTTPS para todas as comunicações em produção
+- 🔑 **Criptografia**: Use criptografia ponta a ponta para mensagens sensíveis
+- 🔄 **Rotação**: Troque suas credenciais regularmente
+
+### Exemplo de Configuração Segura
+
+```python
+import os
+from dotenv import load_dotenv
+
+# Carrega variáveis de ambiente
+load_dotenv()
+
+# Configuração segura
+login = os.getenv("ANDROID_SMS_GATEWAY_LOGIN")
+password = os.getenv("ANDROID_SMS_GATEWAY_PASSWORD")
+
+if not login or not password:
+    raise ValueError("Credenciais não configuradas!")
+```
+
+## 📚 Documentação
+
+### Documentação da API
+
+Para documentação completa da API, incluindo todos os métodos disponíveis, esquemas de requisição/resposta e códigos de erro, acesse:
+
+📘 **[Documentação Oficial da API](https://docs.sms-gate.app/integration/api/)**
+
+### Documentação da Biblioteca
+
+- 📖 [Guia de Instalação](https://docs.sms-gate.app/integration/python/)
+- 🔐 [Guia de Criptografia](https://docs.sms-gate.app/privacy/encryption/)
+- 🌐 [Exemplos de Uso](https://docs.sms-gate.app/integration/python/examples/)
+
+## 🧪 Testes
+
+### Executando os Testes
+
+```bash
+# Instalar dependências de teste
+pip install -e ".[dev]"
+
+# Executar todos os testes
+pytest
+
+# Executar com cobertura
+pytest --cov=android_sms_gateway --cov-report=html
+
+# Executar testes específicos
+pytest tests/test_client.py
+```
+
+### Qualidade do Código
+
+```bash
+# Verificação de estilo
+flake8 android_sms_gateway tests
+black --check android_sms_gateway tests
+isort --check-only android_sms_gateway tests
+
+# Verificação de tipos
+mypy android_sms_gateway
+```
 
 ## 👥 Contribuindo
-Contribuições são bem-vindas! Veja como ajudar:
 
-1. Faça um fork do repositório
-2. Crie sua branch de funcionalidade (`git checkout -b feature/NovaFuncionalidade`)
-3. Faça commit das suas alterações (`git commit -m 'Adiciona NovaFuncionalidade'`)
-4. Faça push para a branch (`git push origin feature/NovaFuncionalidade`)
-5. Abra um Pull Request
+Contribuições são muito bem-vindas! 🎉
+
+### Como Contribuir
+
+1. 🍴 Faça um fork do repositório
+2. 🌿 Crie sua branch de funcionalidade (`git checkout -b feature/NovaFuncionalidade`)
+3. 💾 Faça commit das suas alterações (`git commit -m 'feat: adiciona nova funcionalidade'`)
+4. 📤 Faça push para a branch (`git push origin feature/NovaFuncionalidade`)
+5. 🔄 Abra um Pull Request
+
+### Padrões de Commit
+
+Seguimos o padrão [Conventional Commits](https://www.conventionalcommits.org/):
+
+- `feat:` Nova funcionalidade
+- `fix:` Correção de bug
+- `docs:` Documentação
+- `style:` Formatação de código
+- `refactor:` Refatoração
+- `test:` Testes
+- `chore:` Tarefas de manutenção
 
 ### Ambiente de Desenvolvimento
+
 ```bash
+# Clone o repositório
 git clone https://github.com/android-sms-gateway/client-py.git
 cd client-py
-pipenv install --dev --categories encryption,requests
-pipenv shell
+
+# Configure o ambiente virtual
+python -m venv venv
+source venv/bin/activate  # Linux/Mac
+# ou
+venv\Scripts\activate     # Windows
+
+# Instale dependências
+pip install -e ".[dev,requests,encryption]"
+
+# Configure pre-commit hooks
+pre-commit install
 ```
 
+### Checklist para Pull Requests
+
+- [ ] Código segue os padrões de estilo (black, isort, flake8)
+- [ ] Testes passam localmente
+- [ ] Documentação foi atualizada
+- [ ] Commits seguem o padrão Conventional Commits
+- [ ] Cobertura de testes mantida ou melhorada
+
 ## 📄 Licença
-Distribuído sob a Licença Apache 2.0. Veja [LICENSE](LICENSE) para mais informações.
 
-**Nota**: Android é uma marca registrada da Google LLC. Este projeto não é afiliado nem endossado pela Google[1].
+Este projeto está licenciado sob a **Licença Apache 2.0** - veja o arquivo [LICENSE](LICENSE) para detalhes.
 
-[1] https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/44487462/84be9ca8-aef9-40b2-a817-0e5d29ec814a/paste-2.txt
-[2] https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/44487462/5d57bb9e-c735-4030-bf52-cb19e4556c77/paste.txt
+## 🤝 Suporte
+
+- 📧 **Email**: [suporte@sms-gate.app](mailto:suporte@sms-gate.app)
+- 💬 **Discord**: [Comunidade SMS Gateway](https://discord.gg/sms-gateway)
+- 📖 **Documentação**: [docs.sms-gate.app](https://docs.sms-gate.app)
+- 🐛 **Issues**: [GitHub Issues](https://github.com/android-sms-gateway/client-py/issues)
+
+---
+
+**Nota**: Android é uma marca registrada da Google LLC. Este projeto não é afiliado nem endossado pela Google.
+![CodeRabbit Pull Request Reviews](https://img.shields.io/coderabbit/prs/github/prof-gabrielramos/client-py?utm_source=oss&utm_medium=github&utm_campaign=prof-gabrielramos%2Fclient-py&labelColor=171717&color=FF570A&link=https%3A%2F%2Fcoderabbit.ai&label=CodeRabbit+Reviews)
 ````

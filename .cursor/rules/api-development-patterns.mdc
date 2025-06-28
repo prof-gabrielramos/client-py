@@ -1,5 +1,399 @@
 ---
-description:
-globs:
+description: 
+globs: 
 alwaysApply: false
 ---
+# API Development Patterns
+
+## RESTful API Design Principles
+
+### HTTP Methods and Status Codes
+- Use appropriate HTTP methods: GET, POST, PUT, PATCH, DELETE
+- Return proper HTTP status codes:
+  - 200: OK (successful GET, PUT, PATCH)
+  - 201: Created (successful POST)
+  - 204: No Content (successful DELETE)
+  - 400: Bad Request (client error)
+  - 401: Unauthorized (authentication required)
+  - 403: Forbidden (authorization failed)
+  - 404: Not Found
+  - 422: Unprocessable Entity (validation error)
+  - 500: Internal Server Error
+
+### Response Format Consistency
+```python
+# Success response format
+{
+    "success": True,
+    "data": {...},
+    "message": "Operation completed successfully"
+}
+
+# Error response format
+{
+    "success": False,
+    "error": {
+        "code": "VALIDATION_ERROR",
+        "message": "Invalid input data",
+        "details": {...}
+    }
+}
+```
+
+## Route Organization with Blueprints
+
+### Blueprint Structure
+```python
+# blueprints/user_routes.py
+from flask import Blueprint, request, jsonify
+from marshmallow import ValidationError
+
+user_bp = Blueprint('users', __name__, url_prefix='/api/users')
+
+@user_bp.route('/', methods=['GET'])
+def get_users():
+    """Get all users with pagination."""
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 10, type=int)
+    
+    users = User.query.paginate(
+        page=page, per_page=per_page, error_out=False
+    )
+    
+    return jsonify({
+        'success': True,
+        'data': UserSchema(many=True).dump(users.items),
+        'pagination': {
+            'page': page,
+            'per_page': per_page,
+            'total': users.total,
+            'pages': users.pages
+        }
+    })
+
+@user_bp.route('/', methods=['POST'])
+def create_user():
+    """Create a new user."""
+    try:
+        data = UserSchema().load(request.json)
+    except ValidationError as e:
+        return jsonify({
+            'success': False,
+            'error': {
+                'code': 'VALIDATION_ERROR',
+                'message': 'Invalid input data',
+                'details': e.messages
+            }
+        }), 422
+    
+    # Business logic here
+    user = User(**data)
+    db.session.add(user)
+    db.session.commit()
+    
+    return jsonify({
+        'success': True,
+        'data': UserSchema().dump(user),
+        'message': 'User created successfully'
+    }), 201
+```
+
+## Input Validation and Sanitization
+
+### Marshmallow Schema Validation
+```python
+from marshmallow import Schema, fields, validate, validates, ValidationError
+
+class UserCreateSchema(Schema):
+    email = fields.Email(required=True, validate=validate.Length(min=5, max=255))
+    username = fields.Str(required=True, validate=validate.Length(min=3, max=50))
+    password = fields.Str(required=True, validate=validate.Length(min=8))
+    
+    @validates('username')
+    def validate_username(self, value):
+        if User.query.filter_by(username=value).first():
+            raise ValidationError('Username already exists')
+        return value
+```
+
+### Request Parameter Validation
+```python
+def validate_pagination_params(page: int, per_page: int) -> tuple[int, int]:
+    """Validate and sanitize pagination parameters."""
+    if page < 1:
+        page = 1
+    if per_page < 1 or per_page > 100:
+        per_page = 10
+    
+    return page, per_page
+```
+
+## Error Handling Patterns
+
+### Custom Exception Classes
+```python
+class APIException(Exception):
+    """Base API exception class."""
+    def __init__(self, message: str, status_code: int = 400, error_code: str = None):
+        super().__init__()
+        self.message = message
+        self.status_code = status_code
+        self.error_code = error_code
+
+class ValidationException(APIException):
+    """Raised when input validation fails."""
+    def __init__(self, message: str, details: dict = None):
+        super().__init__(message, 422, 'VALIDATION_ERROR')
+        self.details = details or {}
+
+class ResourceNotFoundException(APIException):
+    """Raised when a requested resource is not found."""
+    def __init__(self, resource_type: str, resource_id: str):
+        message = f"{resource_type} with id {resource_id} not found"
+        super().__init__(message, 404, 'RESOURCE_NOT_FOUND')
+```
+
+### Global Error Handlers
+```python
+@app.errorhandler(APIException)
+def handle_api_exception(error):
+    """Handle custom API exceptions."""
+    response = {
+        'success': False,
+        'error': {
+            'code': error.error_code,
+            'message': error.message
+        }
+    }
+    
+    if hasattr(error, 'details'):
+        response['error']['details'] = error.details
+    
+    return jsonify(response), error.status_code
+
+@app.errorhandler(ValidationError)
+def handle_validation_error(error):
+    """Handle Marshmallow validation errors."""
+    return jsonify({
+        'success': False,
+        'error': {
+            'code': 'VALIDATION_ERROR',
+            'message': 'Invalid input data',
+            'details': error.messages
+        }
+    }), 422
+```
+
+## Authentication and Authorization
+
+### JWT Token Management
+```python
+from flask_jwt_extended import jwt_required, get_jwt_identity, create_access_token
+
+@user_bp.route('/login', methods=['POST'])
+def login():
+    """Authenticate user and return JWT token."""
+    data = LoginSchema().load(request.json)
+    
+    user = User.query.filter_by(email=data['email']).first()
+    if not user or not user.check_password(data['password']):
+        return jsonify({
+            'success': False,
+            'error': {
+                'code': 'AUTHENTICATION_FAILED',
+                'message': 'Invalid email or password'
+            }
+        }), 401
+    
+    access_token = create_access_token(identity=user.id)
+    return jsonify({
+        'success': True,
+        'data': {
+            'access_token': access_token,
+            'user': UserSchema().dump(user)
+        },
+        'message': 'Login successful'
+    })
+
+@user_bp.route('/profile', methods=['GET'])
+@jwt_required()
+def get_profile():
+    """Get current user profile."""
+    user_id = get_jwt_identity()
+    user = User.query.get(user_id)
+    
+    if not user:
+        raise ResourceNotFoundException('User', user_id)
+    
+    return jsonify({
+        'success': True,
+        'data': UserSchema().dump(user)
+    })
+```
+
+## Rate Limiting and Security
+
+### Rate Limiting Implementation
+```python
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+
+limiter = Limiter(
+    app,
+    key_func=get_remote_address,
+    default_limits=["200 per day", "50 per hour"]
+)
+
+@user_bp.route('/login', methods=['POST'])
+@limiter.limit("5 per minute")
+def login():
+    """Rate-limited login endpoint."""
+    # Implementation here
+    pass
+```
+
+### CORS Configuration
+```python
+from flask_cors import CORS
+
+# Configure CORS for API endpoints
+CORS(app, resources={
+    r"/api/*": {
+        "origins": ["http://localhost:3000", "https://yourdomain.com"],
+        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        "allow_headers": ["Content-Type", "Authorization"]
+    }
+})
+```
+
+## Database Query Optimization
+
+### Efficient Query Patterns
+```python
+def get_users_with_relationships(page: int = 1, per_page: int = 10):
+    """Get users with related data using eager loading."""
+    return User.query.options(
+        db.joinedload(User.profile),
+        db.joinedload(User.posts)
+    ).paginate(
+        page=page, per_page=per_page, error_out=False
+    )
+
+def search_users(query: str, limit: int = 10):
+    """Search users with full-text search."""
+    return User.query.filter(
+        db.or_(
+            User.username.ilike(f'%{query}%'),
+            User.email.ilike(f'%{query}%')
+        )
+    ).limit(limit).all()
+```
+
+## API Documentation with Flask-RESTX
+
+### Swagger Documentation
+```python
+from flask_restx import Api, Resource, fields
+
+api = Api(app, version='1.0', title='SMS Gateway API',
+          description='A comprehensive SMS gateway API')
+
+# Define models for documentation
+user_model = api.model('User', {
+    'id': fields.Integer(readonly=True),
+    'email': fields.String(required=True, description='User email'),
+    'username': fields.String(required=True, description='Username'),
+    'created_at': fields.DateTime(readonly=True)
+})
+
+@api.route('/users')
+class UserList(Resource):
+    @api.doc('list_users')
+    @api.marshal_list_with(user_model)
+    def get(self):
+        """List all users"""
+        return get_users()
+    
+    @api.doc('create_user')
+    @api.expect(user_model)
+    @api.marshal_with(user_model, code=201)
+    def post(self):
+        """Create a new user"""
+        return create_user()
+```
+
+## Testing API Endpoints
+
+### Integration Test Examples
+```python
+import pytest
+from app import create_app, db
+from app.models import User
+
+@pytest.fixture
+def client():
+    app = create_app('testing')
+    with app.test_client() as client:
+        with app.app_context():
+            db.create_all()
+            yield client
+            db.drop_all()
+
+def test_create_user_success(client):
+    """Test successful user creation."""
+    response = client.post('/api/users', json={
+        'email': 'test@example.com',
+        'username': 'testuser',
+        'password': 'password123'
+    })
+    
+    assert response.status_code == 201
+    data = response.get_json()
+    assert data['success'] is True
+    assert 'user_id' in data['data']
+
+def test_create_user_validation_error(client):
+    """Test user creation with invalid data."""
+    response = client.post('/api/users', json={
+        'email': 'invalid-email',
+        'username': 'ab',  # Too short
+        'password': '123'   # Too short
+    })
+    
+    assert response.status_code == 422
+    data = response.get_json()
+    assert data['success'] is False
+    assert data['error']['code'] == 'VALIDATION_ERROR'
+```
+
+## Performance Monitoring
+
+### Response Time Logging
+```python
+import time
+from functools import wraps
+
+def log_response_time(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        start_time = time.time()
+        result = f(*args, **kwargs)
+        end_time = time.time()
+        
+        app.logger.info(f"Endpoint {f.__name__} took {end_time - start_time:.3f}s")
+        return result
+    return decorated_function
+
+@user_bp.route('/users')
+@log_response_time
+def get_users():
+    """Get users with response time logging."""
+    # Implementation here
+    pass
+```
+
+## Project References
+- Main application: [app.py](mdc:sms-gateway-web/app.py)
+- Entry point: [run.py](mdc:sms-gateway-web/run.py)
+- Templates: [templates/](mdc:sms-gateway-web/templates)
+- Testing: [tests/](mdc:tests)

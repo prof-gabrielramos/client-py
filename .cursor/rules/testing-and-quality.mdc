@@ -1,5 +1,546 @@
 ---
-description:
-globs:
+description: 
+globs: 
 alwaysApply: false
 ---
+# Testing and Quality Assurance
+
+## Testing Principles
+
+### Test-Driven Development (TDD)
+- Write tests before implementing features
+- Follow the Red-Green-Refactor cycle
+- Ensure high test coverage (aim for 80%+)
+- Test both happy path and edge cases
+
+### Test Structure and Organization
+```
+tests/
+├── __init__.py
+├── conftest.py              # Shared fixtures
+├── unit/
+│   ├── test_models.py
+│   ├── test_services.py
+│   └── test_utils.py
+├── integration/
+│   ├── test_api.py
+│   ├── test_auth.py
+│   └── test_database.py
+└── e2e/
+    └── test_user_workflows.py
+```
+
+## Unit Testing with pytest
+
+### Basic Test Structure
+```python
+import pytest
+from unittest.mock import Mock, patch
+from app.models import User
+from app.services import UserService
+
+class TestUserService:
+    """Test cases for UserService."""
+    
+    def test_create_user_success(self):
+        """Test successful user creation."""
+        # Arrange
+        user_data = {
+            'email': 'test@example.com',
+            'username': 'testuser',
+            'password': 'password123'
+        }
+        
+        # Act
+        user = UserService.create_user(user_data)
+        
+        # Assert
+        assert user.email == user_data['email']
+        assert user.username == user_data['username']
+        assert user.check_password(user_data['password'])
+    
+    def test_create_user_duplicate_email(self):
+        """Test user creation with duplicate email."""
+        # Arrange
+        existing_user = User(email='test@example.com', username='existing')
+        user_data = {
+            'email': 'test@example.com',
+            'username': 'newuser',
+            'password': 'password123'
+        }
+        
+        with patch('app.services.User.query') as mock_query:
+            mock_query.filter_by.return_value.first.return_value = existing_user
+            
+            # Act & Assert
+            with pytest.raises(ValueError, match='Email already exists'):
+                UserService.create_user(user_data)
+```
+
+### Fixtures and Test Data
+```python
+# conftest.py
+import pytest
+from app import create_app, db
+from app.models import User
+
+@pytest.fixture
+def app():
+    """Create application for testing."""
+    app = create_app('testing')
+    return app
+
+@pytest.fixture
+def client(app):
+    """Create test client."""
+    return app.test_client()
+
+@pytest.fixture
+def db_session(app):
+    """Create database session for testing."""
+    with app.app_context():
+        db.create_all()
+        yield db
+        db.drop_all()
+
+@pytest.fixture
+def sample_user(db_session):
+    """Create a sample user for testing."""
+    user = User(
+        email='test@example.com',
+        username='testuser',
+        password='password123'
+    )
+    db_session.session.add(user)
+    db_session.session.commit()
+    return user
+
+@pytest.fixture
+def auth_headers(sample_user, client):
+    """Get authentication headers for testing."""
+    response = client.post('/api/auth/login', json={
+        'email': 'test@example.com',
+        'password': 'password123'
+    })
+    token = response.json['data']['access_token']
+    return {'Authorization': f'Bearer {token}'}
+```
+
+## Integration Testing
+
+### API Endpoint Testing
+```python
+# tests/integration/test_api.py
+import pytest
+from app.models import User
+
+class TestUserAPI:
+    """Integration tests for user API endpoints."""
+    
+    def test_get_users_paginated(self, client, db_session):
+        """Test getting users with pagination."""
+        # Arrange - Create test users
+        users = []
+        for i in range(15):
+            user = User(
+                email=f'user{i}@example.com',
+                username=f'user{i}',
+                password='password123'
+            )
+            db_session.session.add(user)
+            users.append(user)
+        db_session.session.commit()
+        
+        # Act
+        response = client.get('/api/users?page=1&per_page=10')
+        
+        # Assert
+        assert response.status_code == 200
+        data = response.json
+        assert data['success'] is True
+        assert len(data['data']) == 10
+        assert data['pagination']['total'] == 15
+        assert data['pagination']['pages'] == 2
+    
+    def test_create_user_validation_error(self, client):
+        """Test user creation with invalid data."""
+        # Act
+        response = client.post('/api/users', json={
+            'email': 'invalid-email',
+            'username': 'ab',  # Too short
+            'password': '123'   # Too short
+        })
+        
+        # Assert
+        assert response.status_code == 422
+        data = response.json
+        assert data['success'] is False
+        assert data['error']['code'] == 'VALIDATION_ERROR'
+        assert 'email' in data['error']['details']
+        assert 'username' in data['error']['details']
+        assert 'password' in data['error']['details']
+    
+    def test_protected_endpoint_without_auth(self, client):
+        """Test accessing protected endpoint without authentication."""
+        # Act
+        response = client.get('/api/users/profile')
+        
+        # Assert
+        assert response.status_code == 401
+    
+    def test_protected_endpoint_with_auth(self, client, auth_headers):
+        """Test accessing protected endpoint with authentication."""
+        # Act
+        response = client.get('/api/users/profile', headers=auth_headers)
+        
+        # Assert
+        assert response.status_code == 200
+        data = response.json
+        assert data['success'] is True
+        assert 'email' in data['data']
+```
+
+### Database Integration Testing
+```python
+# tests/integration/test_database.py
+import pytest
+from sqlalchemy.exc import IntegrityError
+from app.models import User, Message
+
+class TestDatabaseOperations:
+    """Test database operations and constraints."""
+    
+    def test_user_unique_email_constraint(self, db_session):
+        """Test that email uniqueness constraint is enforced."""
+        # Arrange
+        user1 = User(email='test@example.com', username='user1', password='pass')
+        user2 = User(email='test@example.com', username='user2', password='pass')
+        
+        db_session.session.add(user1)
+        db_session.session.commit()
+        
+        # Act & Assert
+        db_session.session.add(user2)
+        with pytest.raises(IntegrityError):
+            db_session.session.commit()
+    
+    def test_cascade_delete(self, db_session):
+        """Test cascade delete behavior."""
+        # Arrange
+        user = User(email='test@example.com', username='testuser', password='pass')
+        db_session.session.add(user)
+        db_session.session.commit()
+        
+        message = Message(
+            user_id=user.id,
+            content='Test message',
+            phone_number='+1234567890'
+        )
+        db_session.session.add(message)
+        db_session.session.commit()
+        
+        # Act
+        db_session.session.delete(user)
+        db_session.session.commit()
+        
+        # Assert
+        assert Message.query.count() == 0
+```
+
+## Mocking and Stubbing
+
+### External Service Mocking
+```python
+# tests/unit/test_sms_service.py
+import pytest
+from unittest.mock import Mock, patch
+from app.services import SMSService
+
+class TestSMSService:
+    """Test SMS service with mocked external dependencies."""
+    
+    @patch('app.services.requests.post')
+    def test_send_sms_success(self, mock_post):
+        """Test successful SMS sending."""
+        # Arrange
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {'message_id': '12345'}
+        mock_post.return_value = mock_response
+        
+        # Act
+        result = SMSService.send_sms('+1234567890', 'Test message')
+        
+        # Assert
+        assert result['success'] is True
+        assert result['message_id'] == '12345'
+        mock_post.assert_called_once()
+    
+    @patch('app.services.requests.post')
+    def test_send_sms_failure(self, mock_post):
+        """Test SMS sending failure."""
+        # Arrange
+        mock_response = Mock()
+        mock_response.status_code = 400
+        mock_response.json.return_value = {'error': 'Invalid phone number'}
+        mock_post.return_value = mock_response
+        
+        # Act
+        result = SMSService.send_sms('invalid', 'Test message')
+        
+        # Assert
+        assert result['success'] is False
+        assert 'error' in result
+```
+
+## Performance Testing
+
+### Load Testing with pytest-benchmark
+```python
+# tests/performance/test_performance.py
+import pytest
+from app.services import UserService
+
+class TestPerformance:
+    """Performance tests for critical operations."""
+    
+    def test_user_creation_performance(self, benchmark, db_session):
+        """Benchmark user creation performance."""
+        def create_user():
+            return UserService.create_user({
+                'email': 'perf@example.com',
+                'username': 'perfuser',
+                'password': 'password123'
+            })
+        
+        result = benchmark(create_user)
+        assert result is not None
+    
+    def test_user_query_performance(self, benchmark, db_session, sample_user):
+        """Benchmark user query performance."""
+        def query_user():
+            return UserService.get_user_by_id(sample_user.id)
+        
+        result = benchmark(query_user)
+        assert result is not None
+```
+
+## Code Quality and Linting
+
+### Flake8 Configuration
+```ini
+# .flake8
+[flake8]
+max-line-length = 88
+extend-ignore = E203, W503
+exclude = 
+    .git,
+    __pycache__,
+    .venv,
+    venv,
+    migrations
+```
+
+### Type Checking with mypy
+```ini
+# mypy.ini
+[mypy]
+python_version = 3.9
+warn_return_any = True
+warn_unused_configs = True
+disallow_untyped_defs = True
+disallow_incomplete_defs = True
+check_untyped_defs = True
+disallow_untyped_decorators = True
+no_implicit_optional = True
+warn_redundant_casts = True
+warn_unused_ignores = True
+warn_no_return = True
+warn_unreachable = True
+strict_equality = True
+
+[mypy.plugins.sqlalchemy.ext.*]
+init_subclass = True
+```
+
+### Pre-commit Hooks
+```yaml
+# .pre-commit-config.yaml
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.4.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-added-large-files
+  
+  - repo: https://github.com/pycqa/flake8
+    rev: 6.0.0
+    hooks:
+      - id: flake8
+  
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.5.1
+    hooks:
+      - id: mypy
+        additional_dependencies: [types-all]
+  
+  - repo: https://github.com/pycqa/isort
+    rev: 5.12.0
+    hooks:
+      - id: isort
+```
+
+## Test Coverage
+
+### Coverage Configuration
+```ini
+# .coveragerc
+[run]
+source = app
+omit = 
+    */tests/*
+    */migrations/*
+    */__init__.py
+
+[report]
+exclude_lines =
+    pragma: no cover
+    def __repr__
+    if self.debug:
+    if settings.DEBUG
+    raise AssertionError
+    raise NotImplementedError
+    if 0:
+    if __name__ == .__main__.:
+    class .*\bProtocol\):
+    @(abc\.)?abstractmethod
+```
+
+### Coverage Reporting
+```python
+# pytest.ini
+[tool:pytest]
+testpaths = tests
+python_files = test_*.py
+python_classes = Test*
+python_functions = test_*
+addopts = 
+    --cov=app
+    --cov-report=term-missing
+    --cov-report=html
+    --cov-report=xml
+    --cov-fail-under=80
+```
+
+## Security Testing
+
+### Security Test Examples
+```python
+# tests/security/test_security.py
+import pytest
+from app.models import User
+
+class TestSecurity:
+    """Security-related tests."""
+    
+    def test_password_hashing(self, db_session):
+        """Test that passwords are properly hashed."""
+        # Arrange
+        password = 'password123'
+        user = User(
+            email='test@example.com',
+            username='testuser',
+            password=password
+        )
+        
+        # Act
+        db_session.session.add(user)
+        db_session.session.commit()
+        
+        # Assert
+        assert user.password != password
+        assert user.check_password(password)
+        assert not user.check_password('wrongpassword')
+    
+    def test_sql_injection_protection(self, client):
+        """Test protection against SQL injection."""
+        # Act
+        response = client.get('/api/users?search=1%27%20OR%201%3D1--')
+        
+        # Assert
+        assert response.status_code == 200
+        # Should not crash or return unexpected data
+    
+    def test_xss_protection(self, client):
+        """Test protection against XSS attacks."""
+        # Arrange
+        malicious_input = '<script>alert("xss")</script>'
+        
+        # Act
+        response = client.post('/api/users', json={
+            'email': 'test@example.com',
+            'username': malicious_input,
+            'password': 'password123'
+        })
+        
+        # Assert
+        if response.status_code == 201:
+            # If created, ensure the script is not executed
+            user_data = response.json['data']
+            assert '<script>' not in user_data['username']
+```
+
+## Continuous Integration
+
+### GitHub Actions Workflow
+```yaml
+# .github/workflows/test.yml
+name: Tests
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: [3.9, 3.10, 3.11]
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install -r requirements-dev.txt
+    
+    - name: Run linting
+      run: |
+        flake8 app tests
+        isort --check-only app tests
+        mypy app
+    
+    - name: Run tests
+      run: |
+        pytest --cov=app --cov-report=xml
+    
+    - name: Upload coverage
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage.xml
+```
+
+## Project References
+- Main application: [app.py](mdc:sms-gateway-web/app.py)
+- Testing directory: [tests/](mdc:tests)
+- Project configuration: [pyproject.toml](mdc:pyproject.toml)
+- Requirements: [requirements.txt](mdc:requirements.txt)
+- Flake8 config: [.flake8](mdc:.flake8)
