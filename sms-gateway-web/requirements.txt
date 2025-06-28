@@ -1,5 +1,33 @@
-flask==2.0.1
-flask-bootstrap==3.3.7.1
-werkzeug==2.0.1
-requests==2.26.0
-android-sms-gateway-client==0.1.0
+# Core Flask dependencies
+Flask==2.3.3
+Werkzeug==2.3.7
+
+# Security
+Flask-WTF==1.1.1
+Flask-Talisman==1.1.0
+bleach==6.0.0
+
+# Database
+Flask-SQLAlchemy==3.0.5
+Flask-Migrate==4.0.5
+
+# Rate limiting
+Flask-Limiter==3.5.0
+
+# HTTP client
+requests==2.31.0
+
+# SMS Gateway client
+android-sms-gateway>=1.0.0
+
+# Development dependencies
+Flask-DebugToolbar==0.13.1
+
+# Production dependencies
+gunicorn==21.2.0
+redis==5.0.0
+
+# Testing
+pytest==7.4.2
+pytest-flask==1.2.0
+pytest-cov==4.1.0
